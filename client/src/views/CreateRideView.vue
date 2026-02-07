@@ -1,0 +1,179 @@
+<script>
+import api from '../api';
+
+export default {
+    data() {
+        return {
+            step: 1, // 1: Role selection, 2: Form
+            rideRole: 'driver', // 'driver' or 'passenger'
+            fromCity: '',
+            toCity: '',
+            date: '',
+            time: '',
+            price: '',
+            seats: 4,
+            hasVehicle: false,
+            loading: false
+        }
+    },
+    async mounted() {
+        const userStr = localStorage.getItem('user');
+        if (!userStr) {
+            this.$router.push('/auth');
+            return;
+        }
+        const user = JSON.parse(userStr);
+        // Check if user has vehicle
+        try {
+            const res = await api.get(`/users/${user.id}/vehicle`);
+            this.hasVehicle = !!res.data;
+        } catch (e) {
+            console.error(e);
+        }
+    },
+    methods: {
+        selectRole(role) {
+            if (role === 'driver' && !this.hasVehicle) {
+                if (confirm('Для создания поездки в качестве водителя необходимо добавить данные автомобиля в профиле. Перейти в профиль?')) {
+                    this.$router.push('/profile');
+                }
+                return;
+            }
+            this.rideRole = role;
+            this.step = 2;
+        },
+        async createRide() {
+          const user = JSON.parse(localStorage.getItem('user'));
+          
+          try {
+            const payload = {
+              driver_id: user.id,
+              from_city: this.fromCity,
+              to_city: this.toCity,
+              date: this.date,
+              time: this.time,
+              price: parseInt(this.price),
+              seats: this.seats,
+              description: '',
+              is_passenger_entry: this.rideRole === 'passenger'
+            };
+            await api.post('/rides', payload);
+            alert(this.rideRole === 'driver' ? 'Поездка создана!' : 'Заявка создана!');
+            this.$router.push('/');
+          } catch (err) {
+            console.error(err);
+            alert('Ошибка при создании');
+          }
+        }
+    }
+}
+</script>
+
+<template>
+  <div class="bg-gray-50 min-h-screen pb-32">
+    <!-- Header -->
+    <div class="bg-white p-6 pt-8 pb-6 shadow-[0_4px_20px_rgba(0,0,0,0.03)] sticky top-0 z-20 flex items-center">
+       <button v-if="step === 2" @click="step = 1" class="mr-4 p-2 -ml-2 text-gray-400">
+           <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7" /></svg>
+       </button>
+       <div>
+         <h1 class="text-2xl font-bold text-slate-800 tracking-tight">{{ step === 1 ? 'Создать поездку' : (rideRole === 'driver' ? 'Я водитель' : 'Я пассажир') }}</h1>
+         <p class="text-sm text-gray-400 mt-1">{{ step === 1 ? 'Выберите вашу роль' : 'Заполните детали маршрута' }}</p>
+       </div>
+    </div>
+
+    <!-- Step 1: Role Selection -->
+    <div v-if="step === 1" class="p-8 space-y-6 flex-1 flex flex-col justify-center min-h-[60vh]">
+        <div class="grid grid-cols-1 gap-6">
+            <button @click="selectRole('driver')" class="group p-8 rounded-[32px] border-2 border-gray-100 bg-white hover:border-yellow-400 transition-all flex items-center space-x-6 text-left relative overflow-hidden">
+                <div class="absolute inset-0 bg-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="w-16 h-16 rounded-2xl bg-yellow-100 text-yellow-600 flex items-center justify-center text-3xl z-10">🚗</div>
+                <div class="z-10">
+                    <h3 class="font-bold text-xl text-slate-800">Я Водитель</h3>
+                    <p class="text-slate-500 text-sm mt-1">У меня есть машина и я ищу попутчиков</p>
+                </div>
+                <div v-if="!hasVehicle" class="absolute top-4 right-4 bg-orange-100 text-orange-600 text-[10px] font-bold px-2 py-1 rounded-lg">Нужно авто</div>
+            </button>
+
+             <button @click="selectRole('passenger')" class="group p-8 rounded-[32px] border-2 border-gray-100 bg-white hover:border-yellow-400 transition-all flex items-center space-x-6 text-left relative overflow-hidden">
+                 <div class="absolute inset-0 bg-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
+                <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl z-10">👋</div>
+                <div class="z-10">
+                    <h3 class="font-bold text-xl text-slate-800">Я Пассажир</h3>
+                    <p class="text-slate-500 text-sm mt-1">Ищу машину, чтобы доехать до места</p>
+                </div>
+            </button>
+        </div>
+    </div>
+
+    <!-- Step 2: Form -->
+    <div v-if="step === 2" class="p-6 space-y-6 max-w-lg mx-auto">
+      
+      <!-- Route Section -->
+      <section class="space-y-4">
+        <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Маршрут</label>
+        <div class="bg-white p-2 rounded-2xl shadow-sm border border-gray-100 relative overflow-hidden group focus-within:ring-2 focus-within:ring-yellow-500/20 transition-all">
+          <div class="absolute left-6 top-5 bottom-5 w-0.5 bg-gray-100"></div>
+          
+          <div class="relative flex items-center p-3 border-b border-gray-50">
+             <div class="w-3 h-3 rounded-full border-[3px] border-yellow-500 bg-white ml-2 mr-4 z-10 shrink-0"></div>
+             <input v-model="fromCity" placeholder="Откуда" class="w-full text-lg font-medium text-slate-700 placeholder-gray-300 outline-none bg-transparent" />
+          </div>
+          
+          <div class="relative flex items-center p-3">
+             <div class="w-3 h-3 rounded-full border-[3px] border-slate-300 bg-white ml-2 mr-4 z-10 shrink-0"></div>
+             <input v-model="toCity" placeholder="Куда" class="w-full text-lg font-medium text-slate-700 placeholder-gray-300 outline-none bg-transparent" />
+          </div>
+        </div>
+      </section>
+
+      <!-- Date & Time -->
+      <section class="grid grid-cols-2 gap-4">
+        <div class="space-y-2">
+           <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Дата</label>
+           <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center transition-all focus-within:border-yellow-400">
+             <input v-model="date" type="date" class="w-full bg-transparent outline-none text-slate-700 font-medium text-sm" />
+           </div>
+        </div>
+        <div class="space-y-2">
+           <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Время</label>
+           <div class="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 flex items-center transition-all focus-within:border-yellow-400">
+             <input v-model="time" type="time" class="w-full bg-transparent outline-none text-slate-700 font-medium text-sm" />
+           </div>
+        </div>
+      </section>
+
+      <!-- Price & Seats -->
+       <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+        <div class="flex justify-between items-center pb-4 border-b border-gray-50">
+           <span class="text-slate-600 font-medium">Предлагаемая цена</span>
+           <div class="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-xl">
+             <input v-model="price" type="number" placeholder="0" class="w-16 text-right bg-transparent outline-none font-bold text-slate-800 text-lg" />
+             <span class="text-gray-400 font-medium">с.</span>
+           </div>
+        </div>
+        
+        <div v-if="rideRole === 'driver'" class="flex justify-between items-center">
+           <span class="text-slate-600 font-medium">Количество мест</span>
+            <div class="flex items-center space-x-4 bg-gray-50 p-1.5 rounded-xl">
+              <button @click="seats > 1 && seats--" class="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-600 hover:bg-gray-100 active:scale-90 transition-all">
+                <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M3 10a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1z" clip-rule="evenodd" /></svg>
+              </button>
+              <span class="font-bold w-6 text-center text-lg text-slate-800">{{ seats }}</span>
+               <button @click="seats < 8 && seats++" class="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-600 hover:bg-gray-100 active:scale-90 transition-all">
+                 <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
+               </button>
+            </div>
+        </div>
+      </section>
+
+      <button @click="createRide" class="w-full bg-gradient-to-r from-yellow-400 to-amber-500 text-white font-bold py-5 rounded-2xl shadow-lg shadow-amber-500/30 mt-6 active:scale-[0.98] transition-all hover:shadow-xl hover:-translate-y-1 flex items-center justify-center space-x-2">
+        <span>{{ rideRole === 'driver' ? 'Опубликовать поездку' : 'Подать заявку' }}</span>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+          <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6" />
+        </svg>
+      </button>
+    </div>
+  </div>
+
+</template>
