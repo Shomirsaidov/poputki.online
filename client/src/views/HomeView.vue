@@ -289,14 +289,7 @@ export default {
 
       <!-- ======== BUS TICKETS RESULTS ======== -->
       <template v-if="!isLoading && activeTab === 'buses'">
-        <!-- Create button for operators -->
-        <div v-if="user" class="flex justify-end mb-1">
-          <button @click="$router.push({ name: 'create-bus-ticket' })"
-            class="flex items-center gap-2 text-sm font-bold text-blue-600 bg-blue-50 px-4 py-2.5 rounded-xl hover:bg-blue-100 transition-colors active:scale-95">
-            <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4"/></svg>
-            Добавить рейс
-          </button>
-        </div>
+
 
         <TransitionGroup name="list" tag="div" class="space-y-4">
           <div v-for="(ticket, index) in busTickets" :key="ticket.id"
