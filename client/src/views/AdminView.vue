@@ -16,7 +16,15 @@ export default {
             newCityName: '',
             loading: false,
             error: '',
-            mobileMenuOpen: false
+            mobileMenuOpen: false,
+            navItems: [
+                { id: 'dashboard', label: 'Дашборд' },
+                { id: 'users', label: 'Пользователи' },
+                { id: 'rides', label: 'Поездки' },
+                { id: 'bus-tickets', label: 'Автобусы' },
+                { id: 'reviews', label: 'Отзывы' },
+                { id: 'cities', label: 'Города' }
+            ]
         }
     },
     methods: {
@@ -188,13 +196,13 @@ export default {
 
             <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
                 <button 
-                    v-for="item in ['dashboard', 'users', 'rides', 'bus-tickets', 'reviews', 'cities']" 
-                    :key="item"
-                    @click="activeTab = item; mobileMenuOpen = false"
+                    v-for="item in navItems" 
+                    :key="item.id"
+                    @click="activeTab = item.id; mobileMenuOpen = false"
                     class="w-full px-4 py-3 rounded-xl flex items-center space-x-3 transition-all group"
-                    :class="activeTab === item ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'"
+                    :class="activeTab === item.id ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'"
                 >
-                    <span class="capitalize">{{ item.replace('-', ' ') }}</span>
+                    <span class="capitalize">{{ item.label }}</span>
                 </button>
             </nav>
 
@@ -215,7 +223,7 @@ export default {
                     </div>
                 </div>
 
-                <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
+                <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6">
                     <div class="bg-slate-800 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
                         <p class="text-slate-400 text-xs lg:text-sm font-medium uppercase tracking-wider mb-2">Пользователи</p>
                         <h3 class="text-3xl lg:text-4xl font-black">{{ stats.totalUsers }}</h3>
@@ -223,14 +231,6 @@ export default {
                     <div class="bg-slate-800 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
                         <p class="text-slate-400 text-xs lg:text-sm font-medium uppercase tracking-wider mb-2">Активные поездки</p>
                         <h3 class="text-3xl lg:text-4xl font-black text-amber-500">{{ stats.activeRides }}</h3>
-                    </div>
-                    <div class="bg-slate-800 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <p class="text-slate-400 text-xs lg:text-sm font-medium uppercase tracking-wider mb-2">Бронирование шин</p>
-                        <h3 class="text-3xl lg:text-4xl font-black">{{ stats.totalBusBookings }}</h3>
-                    </div>
-                    <div class="bg-slate-800 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <p class="text-slate-400 text-xs lg:text-sm font-medium uppercase tracking-wider mb-2">Выручка (автобусы)</p>
-                        <h3 class="text-3xl lg:text-4xl font-black text-emerald-500">{{ stats.revenue }} с.</h3>
                     </div>
                 </div>
 
