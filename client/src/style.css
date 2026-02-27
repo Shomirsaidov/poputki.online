@@ -24,12 +24,7 @@ body {
 
 #app {
   width: 100%;
-  max-width: 480px;
-  margin: 0 auto;
-  background-color: #ffffff;
   min-height: 100vh;
-  position: relative;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.05);
 }
 
 /* Page Transitions */
