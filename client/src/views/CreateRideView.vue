@@ -33,7 +33,13 @@ export default {
                 type: 'info',
                 onConfirm: null
             },
-            availableCities: []
+            availableCities: [],
+            showRowPrices: false,
+            rowPrices: {
+                front: '',
+                row2: '',
+                row3: ''
+            }
         }
     },
     async mounted() {
@@ -55,16 +61,28 @@ export default {
         } catch (e) {
             console.error(e);
         }
+
+        // Handle pre-fill from query params
+        const query = this.$route.query;
+        if (query.from) this.fromCity = query.from;
+        if (query.to) this.toCity = query.to;
+        if (query.date) this.date = query.date;
+        if (query.time) this.time = query.time;
+        if (query.role) {
+            this.rideRole = query.role;
+            this.step = 2; // Jump to form if role is pre-selected
+        }
+
         this.fetchCities();
     },
     computed: {
         priceRange() {
-            if ((this.fromCity === 'Хучанд' && this.toCity === 'Ойбек') || 
-                (this.fromCity === 'Ойбек' && this.toCity === 'Хучанд')) {
+            if ((this.fromCity === 'Худжанд' && this.toCity === 'Ойбек') || 
+                (this.fromCity === 'Ойбек' && this.toCity === 'Худжанд')) {
                 return { min: 40, max: 60 };
             }
-            if ((this.fromCity === 'Хучанд' && this.toCity === 'Душанбе') || 
-                (this.fromCity === 'Душанбе' && this.toCity === 'Хучанд')) {
+            if ((this.fromCity === 'Худжанд' && this.toCity === 'Душанбе') || 
+                (this.fromCity === 'Душанбе' && this.toCity === 'Худжанд')) {
                 return { min: 100, max: 150 };
             }
             return null;
@@ -98,7 +116,7 @@ export default {
             if (!this.toCity) missing.push('Куда');
             if (!this.date) missing.push('Дата');
             if (!this.time) missing.push('Время');
-            if (this.price === '') missing.push('Цена');
+            if (this.rideRole === 'driver' && this.price === '') missing.push('Цена');
 
             if (missing.length > 0) {
                 this.showAlert('Заполните поля', `Пожалуйста, заполните: ${missing.join(', ')}`, 'warning');
@@ -106,11 +124,34 @@ export default {
             }
             
             // Price Limit Check
-            if (this.priceRange && this.price > this.priceRange.max) {
-                 this.showAlert('Превышена цена', `Для маршрута ${this.fromCity} - ${this.toCity} максимальная цена составляет ${this.priceRange.max} с.`, 'warning');
-                 return;
+            if (this.priceRange) {
+                if (this.price > this.priceRange.max) {
+                     this.showAlert('Превышена цена', `Для маршрута ${this.fromCity} - ${this.toCity} максимальная цена составляет ${this.priceRange.max} с.`, 'warning');
+                     return;
+                }
+                if (this.showRowPrices) {
+                    const r1 = parseInt(this.rowPrices.front) || parseInt(this.price);
+                    const r2 = parseInt(this.rowPrices.row2) || parseInt(this.price);
+                    const r3 = parseInt(this.rowPrices.row3) || parseInt(this.price);
+                    if (r1 > this.priceRange.max || r2 > this.priceRange.max || r3 > this.priceRange.max) {
+                         this.showAlert('Превышена цена', `Для маршрута ${this.fromCity} - ${this.toCity} максимальная цена по любому ряду составляет ${this.priceRange.max} с.`, 'warning');
+                         return;
+                    }
+                }
             }
 
+            // Phone Number Check for all roles
+            const user = JSON.parse(localStorage.getItem('user') || '{}');
+             if (!user.phone) {
+                 this.showAlert(
+                     'Требуется номер телефона', 
+                     'Для создания поездки в качестве водителя или пассажира необходимо добавить номер телефона в профиле. Перейти в профиль?',
+                     'warning',
+                     () => { this.modal.show = false; this.$router.push('/profile'); }
+                 );
+                 return;
+             }
+             
             // Seats Check against Vehicle
             if (this.rideRole === 'driver' && this.seats >= this.vehicleTotalSeats) {
                 this.showAlert('Превышена вместимость', `В вашем автомобиле всего ${this.vehicleTotalSeats} мест(а). Вы не можете указать ${this.seats} свободных мест.`, 'warning');
@@ -129,7 +170,7 @@ export default {
           if (!this.toCity) missing.push('Куда');
           if (!this.date) missing.push('Дата');
           if (!this.time) missing.push('Время');
-          if (this.price === '') missing.push('Цена');
+          if (this.rideRole === 'driver' && this.price === '') missing.push('Цена');
 
           if (missing.length > 0) {
               this.showAlert('Заполните поля', `Пожалуйста, заполните: ${missing.join(', ')}`, 'warning');
@@ -137,9 +178,20 @@ export default {
           }
 
           // Price Limit Check (Double check)
-          if (this.priceRange && this.price > this.priceRange.max) {
-                this.showAlert('Превышена цена', `Для маршрута ${this.fromCity} - ${this.toCity} максимальная цена составляет ${this.priceRange.max} с.`, 'warning');
-                return;
+          if (this.priceRange) {
+              if (this.price > this.priceRange.max) {
+                    this.showAlert('Превышена цена', `Для маршрута ${this.fromCity} - ${this.toCity} максимальная цена составляет ${this.priceRange.max} с.`, 'warning');
+                    return;
+              }
+              if (this.showRowPrices) {
+                  const r1 = parseInt(this.rowPrices.front) || parseInt(this.price);
+                  const r2 = parseInt(this.rowPrices.row2) || parseInt(this.price);
+                  const r3 = parseInt(this.rowPrices.row3) || parseInt(this.price);
+                  if (r1 > this.priceRange.max || r2 > this.priceRange.max || r3 > this.priceRange.max) {
+                       this.showAlert('Превышена цена', `Для маршрута ${this.fromCity} - ${this.toCity} максимальная цена по любому ряду составляет ${this.priceRange.max} с.`, 'warning');
+                       return;
+                  }
+              }
           }
 
           // Reserved Seats Logic Check for Driver
@@ -168,13 +220,18 @@ export default {
               to_address: this.rideRole === 'driver' ? this.toAddress : null,
               date: this.date,
               time: this.time,
-              price: parseInt(this.price),
-              seats: this.seats,
+              price: this.rideRole === 'driver' ? parseInt(this.price) : 0,
+              seats: this.rideRole === 'driver' ? this.seats : 1,
               description: '',
               is_passenger_entry: this.rideRole === 'passenger',
               reserved_seats: this.rideRole === 'driver' ? this.reservedSeats : [],
-              allows_delivery: this.allows_delivery,
-              total_seats: this.rideRole === 'driver' ? this.vehicleTotalSeats : 5
+              allows_delivery: this.rideRole === 'driver' ? this.allows_delivery : false,
+              total_seats: this.rideRole === 'driver' ? this.vehicleTotalSeats : 1,
+              row_prices: this.showRowPrices ? {
+                  front: parseInt(this.rowPrices.front) || parseInt(this.price),
+                  row2: parseInt(this.rowPrices.row2) || parseInt(this.price),
+                  row3: parseInt(this.rowPrices.row3) || parseInt(this.price)
+              } : null
             };
             this.loading = true;
             this.errorMessage = '';
@@ -182,7 +239,7 @@ export default {
             await api.post('/rides', payload);
             
             // Show success and redirect
-            this.$router.push({ path: '/', query: { success: 'true', message: this.rideRole === 'driver' ? 'Поездка создана!' : 'Заявка создана!' } });
+            this.$router.push({ path: '/search', query: { from: this.fromCity, to: this.toCity, date: this.date, success: 'true', message: this.rideRole === 'driver' ? 'Поездка создана!' : 'Заявка создана!' } });
           } catch (err) {
             console.error(err);
             this.errorMessage = err.response?.data?.error || 'Ошибка при создании';
@@ -193,7 +250,7 @@ export default {
         },
         async fetchCities() {
             try {
-                const res = await api.get('/cities');
+                const res = await api.get('/general/cities');
                 this.availableCities = res.data;
             } catch (err) {
                 console.error('Failed to fetch cities:', err);
@@ -243,7 +300,11 @@ export default {
         <div class="grid grid-cols-1 gap-6">
             <button @click="selectRole('driver')" class="group p-8 rounded-[32px] border-2 border-gray-100 bg-white hover:border-yellow-400 transition-all flex items-center space-x-6 text-left relative overflow-hidden">
                 <div class="absolute inset-0 bg-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div class="w-16 h-16 rounded-2xl bg-yellow-100 text-yellow-600 flex items-center justify-center text-3xl z-10">🚗</div>
+                <div class="w-16 h-16 rounded-2xl bg-yellow-100 text-yellow-600 flex items-center justify-center text-3xl z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16H7v-3l2-5h8l2 5v3h-2M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                    </svg>
+                </div>
                 <div class="z-10">
                     <h3 class="font-bold text-xl text-slate-800">Я Водитель</h3>
                     <p class="text-slate-500 text-sm mt-1">У меня есть машина и я ищу попутчиков</p>
@@ -303,11 +364,23 @@ export default {
         <div v-if="rideRole === 'driver'" class="space-y-4 pt-2">
             <div class="space-y-1">
                 <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Точный адрес отправления</label>
-                <input v-model="fromAddress" placeholder="Улица, дом, ориентир" class="w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 outline-none text-slate-700 font-medium text-sm focus:border-yellow-400 transition-all" />
+                <input 
+                  v-model="fromAddress" 
+                  name="from_address"
+                  autocomplete="address-line1"
+                  placeholder="Улица, дом, ориентир" 
+                  class="w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 outline-none text-slate-700 font-medium text-sm focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all placeholder:text-gray-300" 
+                />
             </div>
             <div class="space-y-1">
                 <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Точный адрес прибытия</label>
-                <input v-model="toAddress" placeholder="Улица, дом, ориентир" class="w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 outline-none text-slate-700 font-medium text-sm focus:border-yellow-400 transition-all" />
+                <input 
+                  v-model="toAddress" 
+                  name="to_address"
+                  autocomplete="address-line1"
+                  placeholder="Улица, дом, ориентир" 
+                  class="w-full bg-white p-4 rounded-2xl shadow-sm border border-gray-100 outline-none text-slate-700 font-medium text-sm focus:border-yellow-400 focus:ring-4 focus:ring-yellow-400/10 transition-all placeholder:text-gray-300" 
+                />
             </div>
         </div>
       </section>
@@ -329,26 +402,25 @@ export default {
       </section>
 
       <!-- Price & Seats -->
-       <section class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-6">
+       <section v-if="rideRole === 'driver'" class="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 space-y-6">
          <div class="pb-4 border-b border-gray-50">
             <div class="flex justify-between items-center">
                <span class="text-slate-600 font-medium">Предлагаемая цена</span>
-               <div class="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-xl">
-                 <input v-model="price" type="number" placeholder="0" class="w-16 text-right bg-transparent outline-none font-bold text-slate-800 text-lg" />
-                 <span class="text-gray-400 font-medium">с.</span>
+               <div class="flex items-center space-x-2 bg-gray-50 px-4 py-2 rounded-xl focus-within:ring-2 focus-within:ring-yellow-500/20 transition-all">
+                 <input 
+                   v-model="price" 
+                   type="number" 
+                   name="price"
+                   inputmode="numeric"
+                   placeholder="0" 
+                   class="w-16 text-right bg-transparent outline-none font-bold text-slate-800 text-lg" 
+                 />
+                 <span class="text-gray-400 font-medium font-variant-numeric: tabular-nums">с.</span>
                </div>
             </div>
-            <div v-if="priceRange" class="mt-2 text-right">
-                <p class="text-xs text-gray-500">
-                    Рекомендуемая цена: <span class="font-bold text-slate-700">{{ priceRange.min }} - {{ priceRange.max }} с.</span>
-                </p>
-                <p v-if="price > priceRange.max" class="text-xs text-red-500 font-bold mt-1">
-                    Цена не может превышать {{ priceRange.max }} с.
-                </p>
-            </div>
          </div>
-        
-        <div v-if="rideRole === 'driver'" class="flex justify-between items-center">
+
+         <div v-if="rideRole === 'driver'" class="flex justify-between items-center">
            <span class="text-slate-600 font-medium">Количество мест</span>
             <div class="flex items-center space-x-4 bg-gray-50 p-1.5 rounded-xl">
               <button @click="seats > 1 && seats--" class="w-10 h-10 rounded-lg bg-white shadow-sm flex items-center justify-center text-slate-600 hover:bg-gray-100 active:scale-90 transition-all">
@@ -359,10 +431,9 @@ export default {
                  <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clip-rule="evenodd" /></svg>
                </button>
             </div>
-        </div>
+         </div>
 
-        <!-- Delivery Option -->
-        <div class="flex justify-between items-center pt-4 border-t border-gray-50">
+        <div v-if="rideRole === 'driver'" class="flex justify-between items-center pt-4 border-t border-gray-50">
             <div class="flex flex-col">
               <span class="text-slate-600 font-medium">Принимаю посылки</span>
               <span class="text-xs text-gray-400">Могу взять документы или пакеты</span>
@@ -378,6 +449,50 @@ export default {
               ></div>
             </button>
         </div>
+
+        <!-- Row Prices (Driver only) -->
+        <div v-if="rideRole === 'driver'" class="space-y-4 pt-4 border-t border-gray-50">
+            <div class="flex items-center justify-between">
+                <div class="flex flex-col">
+                    <span class="text-slate-600 font-medium text-sm">Цена по рядам</span>
+                    <span class="text-[10px] text-gray-400 uppercase font-bold tracking-tight">Разная цена для каждого ряда</span>
+                </div>
+                <button 
+                  @click="showRowPrices = !showRowPrices" 
+                  class="w-12 h-6 rounded-full transition-colors relative"
+                  :class="showRowPrices ? 'bg-yellow-400' : 'bg-gray-200'"
+                >
+                  <div 
+                    class="absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm"
+                    :class="showRowPrices ? 'left-7' : 'left-1'"
+                  ></div>
+                </button>
+            </div>
+
+            <div v-if="showRowPrices" class="space-y-3 p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-600">Передний ряд</span>
+                    <div class="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200">
+                        <input v-model="rowPrices.front" type="number" :placeholder="price" class="w-12 text-right bg-transparent outline-none font-bold text-slate-800 text-sm" />
+                        <span class="text-gray-400 text-xs">с.</span>
+                    </div>
+                </div>
+                <div class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-600">Второй ряд</span>
+                    <div class="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200">
+                        <input v-model="rowPrices.row2" type="number" :placeholder="price" class="w-12 text-right bg-transparent outline-none font-bold text-slate-800 text-sm" />
+                        <span class="text-gray-400 text-xs">с.</span>
+                    </div>
+                </div>
+                <div v-if="vehicleTotalSeats > 5" class="flex items-center justify-between">
+                    <span class="text-xs font-bold text-slate-600">Третий ряд</span>
+                    <div class="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200">
+                        <input v-model="rowPrices.row3" type="number" :placeholder="price" class="w-12 text-right bg-transparent outline-none font-bold text-slate-800 text-sm" />
+                        <span class="text-gray-400 text-xs">с.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
       </section>
 
       <button 
@@ -390,7 +505,7 @@ export default {
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>Обработка...</span>
+            <span>Обработка…</span>
         </span>
         <span v-else>{{ rideRole === 'driver' ? 'Далее' : 'Подать заявку' }}</span>
         <svg v-if="!loading" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -405,6 +520,11 @@ export default {
         v-model="reservedSeats" 
         mode="reserve"
         :totalSeats="vehicleTotalSeats"
+        :rowPrices="showRowPrices ? {
+                  front: parseInt(rowPrices.front) || parseInt(price),
+                  row2: parseInt(rowPrices.row2) || parseInt(price),
+                  row3: parseInt(rowPrices.row3) || parseInt(price)
+              } : {}"
       />
 
       <button 
@@ -417,7 +537,7 @@ export default {
                 <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
                 <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
             </svg>
-            <span>Публикация...</span>
+            <span>Публикация…</span>
         </span>
         <span v-else>Опубликовать поездку</span>
         <svg v-if="!loading" xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
