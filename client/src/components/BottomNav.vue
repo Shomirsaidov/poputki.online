@@ -8,6 +8,9 @@ export default {
   methods: {
     navigate(name) {
       this.$router.push({ name });
+    },
+    isActive(name) {
+      return this.currentRoute === name;
     }
   }
 }
@@ -15,35 +18,63 @@ export default {
 
 <template>
   <div class="fixed bottom-0 left-0 right-0 z-50 flex justify-center pointer-events-none">
-    <div class="bg-white/90 backdrop-blur-lg border-t border-gray-100 flex justify-around items-center h-[80px] pb-safe w-full max-w-[480px] shadow-[0_-5px_20px_rgba(0,0,0,0.03)] pointer-events-auto rounded-t-3xl">
-      
-      <button @click="navigate('home')" class="group flex flex-col items-center justify-center w-full h-full relative overflow-hidden">
-        <div :class="['absolute inset-0 bg-yellow-50 opacity-0 transition-opacity duration-300', currentRoute === 'home' ? 'opacity-100' : 'group-hover:opacity-50']"></div>
-        <div :class="['relative transition-transform duration-300 transform', currentRoute === 'home' ? '-translate-y-1' : 'group-hover:-translate-y-1']">
-          <svg xmlns="http://www.w3.org/2000/svg" :class="['h-7 w-7 transition-colors duration-300', currentRoute === 'home' ? 'text-yellow-500 fill-yellow-500/10' : 'text-gray-400']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" />
-          </svg>
-        </div>
-        <span :class="['text-[10px] font-medium mt-1 transition-colors duration-300 relative', currentRoute === 'home' ? 'text-yellow-600' : 'text-gray-400']">Найти</span>
-      </button>
-      
-      <button @click="navigate('create-ride')" class="group flex flex-col items-center justify-center w-full h-full relative">
-         <div class="absolute -top-6 bg-yellow-500 p-4 rounded-2xl shadow-lg shadow-yellow-500/30 transition-transform duration-300 group-hover:scale-105 group-active:scale-95 border-[4px] border-white">
-            <svg xmlns="http://www.w3.org/2000/svg" class="h-7 w-7 text-white" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M12 4v16m8-8H4" />
-            </svg>
-         </div>
-         <span class="text-[10px] font-medium mt-8 text-gray-500 transition-colors group-hover:text-yellow-600">Создать</span>
+    <div class="bg-white/95 backdrop-blur-xl border-t border-gray-100/80 flex justify-around items-stretch h-[72px] pb-safe w-full max-w-[480px] shadow-[0_-8px_32px_rgba(0,0,0,0.06)] pointer-events-auto">
+
+      <!-- Find -->
+      <button @click="navigate('search')"
+        class="group flex flex-col items-center justify-center flex-1 gap-1 relative transition-all duration-200 active:scale-95">
+        <div class="absolute inset-x-0 top-0 h-[2.5px] rounded-b-full transition-all duration-300"
+          :class="isActive('search') ? 'bg-amber-500' : 'bg-transparent'"></div>
+        <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6 transition-colors duration-200"
+          :class="isActive('search') ? 'text-amber-500' : 'text-gray-400'"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z"/>
+        </svg>
+        <span class="text-[10px] font-semibold transition-colors duration-200"
+          :class="isActive('search') ? 'text-amber-500' : 'text-gray-400'">Найти</span>
       </button>
 
-      <button @click="navigate('profile')" class="group flex flex-col items-center justify-center w-full h-full relative overflow-hidden">
-        <div :class="['absolute inset-0 bg-yellow-50 opacity-0 transition-opacity duration-300', currentRoute === 'profile' ? 'opacity-100' : 'group-hover:opacity-50']"></div>
-        <div :class="['relative transition-transform duration-300 transform', currentRoute === 'profile' ? '-translate-y-1' : 'group-hover:-translate-y-1']">
-          <svg xmlns="http://www.w3.org/2000/svg" :class="['h-7 w-7 transition-colors duration-300', currentRoute === 'profile' ? 'text-yellow-500 fill-yellow-500/10' : 'text-gray-400']" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-          </svg>
-        </div>
-        <span :class="['text-[10px] font-medium mt-1 transition-colors duration-300 relative', currentRoute === 'profile' ? 'text-yellow-600' : 'text-gray-400']">Профиль</span>
+      <!-- My Rides -->
+      <button @click="navigate('my-rides')"
+        class="group flex flex-col items-center justify-center flex-1 gap-1 relative transition-all duration-200 active:scale-95">
+        <div class="absolute inset-x-0 top-0 h-[2.5px] rounded-b-full transition-all duration-300"
+          :class="isActive('my-rides') ? 'bg-amber-500' : 'bg-transparent'"></div>
+        <svg class="h-6 w-6 transition-colors duration-200"
+          :class="isActive('my-rides') ? 'text-amber-500' : 'text-gray-400'"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z"/>
+          <path stroke-linecap="round" stroke-linejoin="round" d="M13 16H7v-3l2-5h8l2 5v3h-2M5 16H3v-3l2-5"/>
+        </svg>
+        <span class="text-[10px] font-semibold transition-colors duration-200"
+          :class="isActive('my-rides') ? 'text-amber-500' : 'text-gray-400'">Поездки</span>
+      </button>
+
+      <!-- Create Ride -->
+      <button @click="navigate('create-ride')"
+        class="group flex flex-col items-center justify-center flex-1 gap-1 relative transition-all duration-200 active:scale-95">
+        <div class="absolute inset-x-0 top-0 h-[2.5px] rounded-b-full transition-all duration-300"
+          :class="isActive('create-ride') ? 'bg-amber-500' : 'bg-transparent'"></div>
+        <svg class="h-6 w-6 transition-colors duration-200"
+          :class="isActive('create-ride') ? 'text-amber-500' : 'text-gray-400'"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M12 4v16m8-8H4"/>
+        </svg>
+        <span class="text-[10px] font-semibold transition-colors duration-200"
+          :class="isActive('create-ride') ? 'text-amber-500' : 'text-gray-400'">Создать</span>
+      </button>
+
+      <!-- Profile -->
+      <button @click="navigate('profile')"
+        class="group flex flex-col items-center justify-center flex-1 gap-1 relative transition-all duration-200 active:scale-95">
+        <div class="absolute inset-x-0 top-0 h-[2.5px] rounded-b-full transition-all duration-300"
+          :class="isActive('profile') ? 'bg-amber-500' : 'bg-transparent'"></div>
+        <svg class="h-6 w-6 transition-colors duration-200"
+          :class="isActive('profile') ? 'text-amber-500' : 'text-gray-400'"
+          fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+          <path stroke-linecap="round" stroke-linejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z"/>
+        </svg>
+        <span class="text-[10px] font-semibold transition-colors duration-200"
+          :class="isActive('profile') ? 'text-amber-500' : 'text-gray-400'">Профиль</span>
       </button>
 
     </div>

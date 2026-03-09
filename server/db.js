@@ -1,60 +1,11 @@
-const Database = require('better-sqlite3');
-const path = require('path');
+const { createClient } = require('@supabase/supabase-js');
+require('dotenv').config();
 
-const dbPath = path.resolve(__dirname, 'poputki.db');
-const db = new Database(dbPath, { verbose: console.log });
+// Initialize Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL || 'https://kszjwfnjrfouawkqjbwc.supabase.co';
+const supabaseKey = process.env.SUPABASE_ANON_KEY || 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Imtzemp3Zm5qcmZvdWF3a3FqYndjIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzI5ODQ2NDMsImV4cCI6MjA4ODU2MDY0M30.zyK0VyKbl10rgOc36Tsugj4zWJnRN1N-LOEG2ZiXToY';
 
-// Initialize tables
-db.exec(`
-  CREATE TABLE IF NOT EXISTS users (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    phone TEXT UNIQUE NOT NULL,
-    name TEXT,
-    surname TEXT,
-    age INTEGER,
-    sex TEXT,
-    role TEXT DEFAULT 'passenger', -- 'passenger' or 'driver'
-    rating REAL DEFAULT 5.0
-  );
+// Create a single supabase client for interacting with your database
+const supabase = createClient(supabaseUrl, supabaseKey);
 
-  CREATE TABLE IF NOT EXISTS vehicles (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    user_id INTEGER NOT NULL,
-    make TEXT NOT NULL,
-    model TEXT NOT NULL,
-    plate_number TEXT NOT NULL,
-    FOREIGN KEY (user_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS rides (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    driver_id INTEGER NOT NULL,
-    from_city TEXT NOT NULL,
-    to_city TEXT NOT NULL,
-    date TEXT NOT NULL,
-    time TEXT NOT NULL,
-    price INTEGER NOT NULL,
-    seats INTEGER NOT NULL,
-    description TEXT,
-    is_passenger_entry INTEGER DEFAULT 0, -- 1 if created by passenger
-    FOREIGN KEY (driver_id) REFERENCES users(id)
-  );
-
-  CREATE TABLE IF NOT EXISTS bookings (
-    id INTEGER PRIMARY KEY AUTOINCREMENT,
-    ride_id INTEGER NOT NULL,
-    passenger_id INTEGER NOT NULL,
-    status TEXT DEFAULT 'confirmed',
-    FOREIGN KEY (ride_id) REFERENCES rides(id),
-    FOREIGN KEY (passenger_id) REFERENCES users(id)
-  );
-`);
-
-// Migration for existing databases
-try { db.exec("ALTER TABLE users ADD COLUMN surname TEXT;"); } catch (e) { }
-try { db.exec("ALTER TABLE users ADD COLUMN age INTEGER;"); } catch (e) { }
-try { db.exec("ALTER TABLE users ADD COLUMN sex TEXT;"); } catch (e) { }
-try { db.exec("ALTER TABLE rides ADD COLUMN is_passenger_entry INTEGER DEFAULT 0;"); } catch (e) { }
-
-
-module.exports = db;
+module.exports = supabase;

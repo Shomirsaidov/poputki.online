@@ -61,7 +61,7 @@ async function sendBroadcast(text, rideId = null) {
     }
 
     inlineKeyboard.push([
-        { text: 'Наш бот', url: BOT_LINK }
+        { text: 'Открыть приложение', url: 'https://t.me/poputkionline_bot' }
     ]);
 
     const options = {

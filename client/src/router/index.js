@@ -1,5 +1,5 @@
 import { createRouter, createWebHistory } from 'vue-router'
-import HomeView from '../views/HomeView.vue'
+import LandingView from '../views/LandingView.vue'
 import RideSeatSelectionView from '../views/RideSeatSelectionView.vue';
 import BusAdminView from '../views/BusAdminView.vue';
 import { getTelegramUser, getTelegramInitData } from '../telegram';
@@ -9,8 +9,13 @@ const router = createRouter({
     routes: [
         {
             path: '/',
-            name: 'home',
-            component: HomeView
+            name: 'landing',
+            component: LandingView
+        },
+        {
+            path: '/search',
+            name: 'search',
+            component: () => import('../views/SearchResultsView.vue')
         },
         {
             path: '/create',
@@ -153,7 +158,7 @@ router.beforeEach(async (to, from, next) => {
 
     // 3. Standard Navigation Guard
     const isAuthenticated = !!localStorage.getItem('token');
-    const publicRoutes = ['auth', 'admin', 'bus-admin', 'ride-details'];
+    const publicRoutes = ['auth', 'admin', 'bus-admin', 'ride-details', 'landing', 'search'];
 
     if (!publicRoutes.includes(to.name) && !isAuthenticated) {
         next({ name: 'auth' });

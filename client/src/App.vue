@@ -10,15 +10,15 @@ export default {
 </script>
 
 <template>
-  <div :class="['app-container', { 'admin-mode': $route.meta.hideBottomNav }]">
-    <main :class="{ 'pb-20': !$route.meta.hideBottomNav }" class="min-h-screen">
+  <div :class="['app-container', { 'admin-mode': $route.meta?.hideBottomNav, 'landing-mode': $route.name === 'landing' }]">
+    <main :class="{ 'pb-20': !$route.meta?.hideBottomNav && $route.name !== 'landing' }" class="min-h-screen">
       <RouterView v-slot="{ Component }">
         <Transition name="page" mode="out-in">
           <component :is="Component" />
         </Transition>
       </RouterView>
     </main>
-    <BottomNav v-if="!$route.meta.hideBottomNav && $route.name !== 'auth'" />
+    <BottomNav v-if="!$route.meta?.hideBottomNav && $route.name !== 'auth' && $route.name !== 'landing'" />
   </div>
 </template>
 
@@ -36,6 +36,13 @@ export default {
   max-width: 100%;
   margin: 0;
   background: #0f172a;
+  box-shadow: none;
+}
+
+.app-container.landing-mode {
+  max-width: 100%;
+  margin: 0;
+  background: white;
   box-shadow: none;
 }
 </style>

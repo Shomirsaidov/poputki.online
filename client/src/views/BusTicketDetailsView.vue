@@ -80,7 +80,7 @@ export default {
 
                 <div class="flex items-center gap-2 mb-3 relative z-10">
                     <div class="bg-white/20 backdrop-blur px-3 py-1 rounded-full">
-                        <span class="text-white text-xs font-semibold">Автобус</span>
+                        <span class="text-white text-xs font-semibold">{{ ticket.bus_type === 'double' ? 'Двухэтажный' : 'Одноэтажный' }}</span>
                     </div>
                     <div class="bg-white/20 backdrop-blur px-3 py-1 rounded-full">
                         <span class="text-white text-xs font-semibold">{{ ticket.transport_company }}</span>
@@ -133,34 +133,56 @@ export default {
                     </div>
                 </div>
 
-                <!-- Route Details -->
-                <div class="bg-white rounded-3xl p-5 shadow-sm border border-gray-100">
-                    <h3 class="font-bold text-slate-700 text-sm mb-4 uppercase tracking-wider">Детали маршрута</h3>
-                    <div class="space-y-4">
-                        <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-blue-50 flex items-center justify-center mt-0.5 shrink-0">
-                                <svg class="w-4 h-4 text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><circle cx="12" cy="12" r="3"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v3m0 14v3M2 12h3m14 0h3"/></svg>
+                <!-- Route Timeline -->
+                <div class="bg-white rounded-3xl p-6 shadow-sm border border-gray-100">
+                    <h3 class="font-bold text-slate-700 text-sm mb-6 uppercase tracking-wider">Детали маршрута</h3>
+                    
+                    <div class="relative pl-6 space-y-8 before:absolute before:left-[11px] before:top-2 before:bottom-2 before:w-[2px] before:bg-gradient-to-b before:from-blue-600 before:via-blue-300 before:to-indigo-600 before:rounded-full">
+                        
+                        <!-- Start -->
+                        <div class="relative">
+                            <div class="absolute -left-[21px] top-1.5 w-3 h-3 rounded-full bg-blue-600 border-4 border-blue-100 ring-4 ring-white shadow-sm"></div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-black text-slate-800 text-lg">{{ ticket.departure_time }}</span>
+                                <span class="text-[10px] font-bold text-blue-600 uppercase tracking-widest bg-blue-50 px-2 py-0.5 rounded-lg border border-blue-100">Отправление</span>
                             </div>
-                            <div>
-                                <div class="text-xs text-gray-400 font-medium">Отправление</div>
-                                <div class="font-bold text-slate-800">{{ ticket.from_city }}</div>
-                                <div class="text-sm text-gray-500">{{ ticket.from_address }}</div>
-                                <div class="text-sm font-semibold text-blue-600 mt-0.5">{{ ticket.departure_date }} · {{ ticket.departure_time }}</div>
-                            </div>
+                            <div class="font-bold text-slate-700">{{ ticket.from_city }}</div>
+                            <div class="text-xs text-gray-500 mt-0.5">{{ ticket.from_address }}</div>
                         </div>
-                        <div class="ml-4 h-6 w-[2px] bg-gradient-to-b from-blue-300 to-indigo-300 ml-[15px]"></div>
-                        <div class="flex items-start gap-3">
-                            <div class="w-8 h-8 rounded-xl bg-indigo-50 flex items-center justify-center mt-0.5 shrink-0">
-                                <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z"/><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z"/></svg>
+
+                        <!-- Intermediate Stops -->
+                        <div v-for="(stop, idx) in (ticket.intermediate_stops || [])" :key="idx" class="relative">
+                            <div class="absolute -left-[20px] top-1.5 w-2.5 h-2.5 rounded-full bg-white border-2 border-blue-400 shadow-sm"></div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-bold text-slate-800">{{ stop.time }}</span>
+                                <span class="text-[9px] font-bold text-gray-400 uppercase tracking-widest">Остановка</span>
                             </div>
-                            <div>
-                                <div class="text-xs text-gray-400 font-medium">Прибытие</div>
-                                <div class="font-bold text-slate-800">{{ ticket.to_city }}</div>
-                                <div class="text-sm text-gray-500">{{ ticket.to_address }}</div>
-                                <div class="text-sm font-semibold text-indigo-600 mt-0.5">{{ ticket.arrival_date }} · {{ ticket.arrival_time }}</div>
+                            <div class="font-semibold text-slate-700 text-sm">{{ stop.city }}</div>
+                            <div v-if="stop.address" class="text-[11px] text-gray-400 mt-0.5">{{ stop.address }}</div>
+                        </div>
+
+                        <!-- End -->
+                        <div class="relative pt-2">
+                            <div class="absolute -left-[21px] top-3.5 w-3 h-3 rounded-full bg-indigo-600 border-4 border-indigo-100 ring-4 ring-white shadow-sm"></div>
+                            <div class="flex items-center justify-between mb-1">
+                                <span class="font-black text-slate-800 text-lg">{{ ticket.arrival_time }}</span>
+                                <span class="text-[10px] font-bold text-indigo-600 uppercase tracking-widest bg-indigo-50 px-2 py-0.5 rounded-lg border border-indigo-100">Прибытие</span>
                             </div>
+                            <div class="font-bold text-slate-700">{{ ticket.to_city }}</div>
+                            <div class="text-xs text-gray-500 mt-0.5">{{ ticket.to_address }}</div>
                         </div>
                     </div>
+                </div>
+
+                <!-- Passenger Comments -->
+                <div v-if="ticket.passenger_comments" class="bg-indigo-50/50 rounded-3xl p-5 border border-indigo-100/50">
+                    <div class="flex items-center gap-2 mb-3">
+                        <svg class="w-4 h-4 text-indigo-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M13 16h-1v-4h-1m1-4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z"/></svg>
+                        <span class="text-[10px] font-black text-indigo-400 uppercase tracking-widest">Комментарий к рейсу</span>
+                    </div>
+                    <p class="text-sm text-slate-700 leading-relaxed italic">
+                        "{{ ticket.passenger_comments }}"
+                    </p>
                 </div>
 
                 <!-- Book button -->

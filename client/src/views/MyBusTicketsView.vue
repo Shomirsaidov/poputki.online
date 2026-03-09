@@ -106,7 +106,7 @@ export default {
             </div>
             <h3 class="text-xl font-bold text-slate-700 mb-2">Нет билетов</h3>
             <p class="text-gray-400 text-sm mb-6">У вас ещё нет купленных автобусных билетов</p>
-            <button @click="$router.push({ name: 'home', query: { tab: 'bus' } })"
+            <button @click="$router.push({ name: 'search', query: { tab: 'bus' } })"
                 class="bg-blue-600 text-white font-bold px-6 py-3 rounded-2xl shadow-lg shadow-blue-500/30 active:scale-95 transition-all">
                 Найти рейс
             </button>
