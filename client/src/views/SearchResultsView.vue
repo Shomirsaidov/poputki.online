@@ -1,3 +1,4 @@
+<script>
 import api from '../api';
 import { getTelegramUser, getTelegramInitData } from '../telegram';
 
