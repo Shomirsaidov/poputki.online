@@ -1,11 +1,13 @@
 <script>
 import api from '../api';
 import AppModal from '../components/AppModal.vue';
+import AppLogo from '../components/AppLogo.vue';
 import { getTelegramUser, getTelegramInitData } from '../telegram';
 
 export default {
   components: {
-    AppModal
+    AppModal,
+    AppLogo
   },
   data() {
     return {
@@ -164,9 +166,13 @@ export default {
     <div class="flex-1 flex flex-col justify-center p-8 relative z-10">
       <div v-if="step === 1">
         <div class="mb-8">
-           <div class="w-16 h-16 bg-yellow-500 rounded-2xl flex items-center justify-center text-white mb-6 shadow-lg shadow-yellow-500/30 transform -rotate-6">
-              <svg xmlns="http://www.w3.org/2000/svg" class="h-8 w-8" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 10V3L4 14h7v7l9-11h-7z" /></svg>
-           </div>
+           <AppLogo 
+              :showText="false" 
+              containerClass="mb-6 transform -rotate-6"
+              iconSizeClass="w-16 h-16"
+              iconClass="h-8 w-8"
+              iconBgClass="bg-yellow-500 shadow-lg shadow-yellow-500/30"
+           />
            <h1 class="text-4xl font-bold text-slate-900 mb-3 tracking-tight">
              Салом{{ tgName ? ', ' + tgName : '' }}!
            </h1>

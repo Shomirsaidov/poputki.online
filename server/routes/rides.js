@@ -308,15 +308,25 @@ router.post('/', async (req, res) => {
             const broadcastMsg = `🙋 ПАССАЖИР ИЩЕТ ПОЕЗДКУ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `📝 <b>ЗАЯВКА ОПУБЛИКОВАНА</b>\n\nВы успешно начали поиск машины:\n🚗 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n\n<i>Ваша заявка видна водителям. Как только кто-то предложит место, вы получите уведомление!</i>`;
-            sendPersonalMessage(driver_id, personalMsg);
+            const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
+            const options = {
+                reply_markup: {
+                    inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                }
+            };
+            sendPersonalMessage(driver_id, personalMsg, options);
         } else {
             const deliveryText = allows_delivery ? '\n📦 Беру посылки' : '';
             const broadcastMsg = `🚗 ВОДИТЕЛЬ ИЩЕТ ПАССАЖИРОВ\n📍 Маршрут: ${from_city} ➡ ${to_city}\n🗓 Дата: ${dateStr}\n⏰ Время: ${timeStr}\n 💺 Свободных мест: ${seats}${deliveryText}`;
             sendBroadcast(broadcastMsg, ride.id);
 
-            const personalMsg = `🚀 <b>ПОЕЗДКА СОЗДАНА</b>\n\nВы успешно опубликовали поездку:\n📍 <b>Маршрут:</b> ${from_city} ➡ ${to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💺 <b>Количество мест:</b> ${seats}\n\n<i>Ваше объявление добавлено в ленту. Вы получите уведомление при новом бронировании.</i>`;
-            sendPersonalMessage(driver_id, personalMsg);
+            const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${ride.id}`;
+            const options = {
+                reply_markup: {
+                    inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+                }
+            };
+            sendPersonalMessage(driver_id, personalMsg, options);
         }
 
     } catch (err) {
@@ -507,23 +517,29 @@ router.post('/:id/share', async (req, res) => {
     const passengerReqId = req.params.id;
     const { driver_ride_id } = req.body;
     try {
-        const { data: passengerReq } = await supabase
+        const { data: passengerReq, error: pError } = await supabase
             .from('rides')
             .select('*')
             .eq('id', passengerReqId)
             .single();
 
-        if (!passengerReq || !passengerReq.is_passenger_entry) {
-            return res.status(400).json({ error: 'Заявка пассажира не найдена' });
+        if (pError || !passengerReq) {
+            console.error('Share error (passengerReq):', pError);
+            return res.status(404).json({ error: 'Заявка пассажира не найдена' });
         }
 
-        const { data: driverRide } = await supabase
+        if (!passengerReq.is_passenger_entry) {
+            return res.status(400).json({ error: 'Эта поездка не является заявкой пассажира' });
+        }
+
+        const { data: driverRide, error: dError } = await supabase
             .from('rides')
             .select(`*, users:driver_id(name, phone)`)
             .eq('id', driver_ride_id)
             .single();
 
-        if (!driverRide) {
+        if (dError || !driverRide) {
+            console.error('Share error (driverRide):', dError);
             return res.status(404).json({ error: 'Поездка водителя не найдена' });
         }
 
@@ -535,7 +551,18 @@ router.post('/:id/share', async (req, res) => {
         // Add to telegram queue or send right away
         const msg = `🚗 <b>ВСТРЕЧНОЕ ПРЕДЛОЖЕНИЕ ПОЕЗДКИ</b>\n\nВодитель <b>${driverName}</b> предлагает вам присоединиться к его поездке:\n📍 <b>Маршрут:</b> ${driverRide.from_city} ➡ ${driverRide.to_city}\n🗓 <b>Дата и время:</b> ${dateStr} в ${timeStr}\n💵 <b>Цена от:</b> ${driverRide.price} с.\n\n📞 <b>Связаться с водителем:</b> +${driverPhone}\n\n<i>Откройте список поездок, найдите водителя и забронируйте место!</i>`;
 
-        sendPersonalMessage(passengerReq.driver_id, msg);
+        const rideUrl = `${process.env.MINI_APP_URL || 'https://poputki.online'}/ride/${driver_ride_id}`;
+        const options = {
+            reply_markup: {
+                inline_keyboard: [[{ text: 'Открыть поездку', url: rideUrl }]]
+            }
+        };
+
+        const personalMsgSuccess = await sendPersonalMessage(passengerReq.driver_id, msg, options);
+
+        if (!personalMsgSuccess) {
+            return res.status(500).json({ error: 'Не удалось отправить уведомление пассажиру. Возможно, он не запустил бота.' });
+        }
 
         res.json({ success: true });
     } catch (err) {

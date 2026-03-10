@@ -1,5 +1,6 @@
 <script>
 import api from '../api';
+import AppLogo from '../components/AppLogo.vue';
 import { 
   Chart as ChartJS, 
   Title, 
@@ -27,7 +28,8 @@ ChartJS.register(
 export default {
     components: {
         LineChart: Line,
-        PieChart: Pie
+        PieChart: Pie,
+        AppLogo
     },
     data() {
         return {
@@ -306,7 +308,9 @@ export default {
                 await api.post('/admin/cities', { name: this.newCityName });
                 this.newCityName = '';
                 this.fetchCities();
-            } catch (e) { alert('Ошибка при довалении города'); }
+            } catch (e) { 
+                alert(e.response?.data?.error || 'Ошибка при добавлении города'); 
+            }
         },
         async deleteCity(id) {
             if (confirm('Удалить город?')) {
@@ -395,7 +399,12 @@ export default {
         <!-- Mobile Header (Visible only on mobile) -->
         <div class="lg:hidden fixed top-0 inset-x-0 z-40 bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
             <div class="flex items-center space-x-3">
-                <div class="w-8 h-8 bg-amber-500 rounded-lg flex items-center justify-center text-slate-900 font-black text-lg">P</div>
+                <AppLogo 
+                    :showText="false" 
+                    iconSizeClass="w-8 h-8"
+                    iconClass="h-5 w-5"
+                    iconBgClass="bg-amber-500 text-slate-900"
+                />
                 <span class="text-lg font-bold tracking-tight">Admin</span>
             </div>
             <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-slate-300 p-2">
@@ -441,7 +450,12 @@ export default {
         >
             <div class="px-8 mb-12">
                 <div class="flex items-center space-x-3">
-                    <div class="w-10 h-10 bg-amber-500 rounded-xl flex items-center justify-center text-slate-900 font-black text-xl">P</div>
+                    <AppLogo 
+                        :showText="false" 
+                        iconSizeClass="w-10 h-10"
+                        iconClass="h-6 w-6"
+                        iconBgClass="bg-amber-500 text-slate-900"
+                    />
                     <span class="text-xl font-bold tracking-tight">Poputki Admin</span>
                 </div>
             </div>

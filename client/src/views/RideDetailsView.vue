@@ -13,6 +13,7 @@ export default {
             ride: null,
             loading: true,
             user: JSON.parse(localStorage.getItem('user') || 'null'),
+            matchingDriverRides: [],
             modal: {
                 show: false,
                 title: '',
@@ -49,6 +50,7 @@ export default {
             try {
                 const res = await api.get(`/rides/${this.$route.params.id}`);
                 this.ride = res.data;
+                this.checkMatchingRides();
             } catch (e) {
                 console.error(e);
                 this.showAlert('Ошибка', 'Ошибка при загрузке поездки', 'error', () => {
@@ -58,6 +60,37 @@ export default {
             } finally {
                 this.loading = false;
             }
+        },
+        async checkMatchingRides() {
+            if (!this.user || !this.ride || !this.ride.is_passenger_entry) return;
+            try {
+               const res = await api.get('/rides', { 
+                   params: { from: this.ride.from_city, to: this.ride.to_city } 
+               }); 
+               this.matchingDriverRides = res.data.filter(r => 
+                  r.driver_id === this.user.id && 
+                  !r.is_passenger_entry && 
+                  r.status === 'active'
+               );
+            } catch(e) {
+                console.error(e);
+            }
+        },
+        async shareRide(driverRideId) {
+            this.showConfirm(
+                'Предложить поездку',
+                'Отправить пассажиру встречное предложение вашей поездки?',
+                async () => {
+                    this.modal.show = false;
+                    try {
+                        await api.post(`/rides/${this.ride.id}/share`, { driver_ride_id: driverRideId });
+                        this.showAlert('Успешно', 'Мы уведомили пассажира о вашей поездке. Ожидайте бронирования!', 'success');
+                    } catch (e) {
+                        console.error(e);
+                        this.showAlert('Ошибка', e.response?.data?.error || 'Не удалось предложить поездку', 'error');
+                    }
+                }
+            );
         },
         openSeatSelection() {
             if (!this.user) {
@@ -81,6 +114,22 @@ export default {
             if (isNaN(d)) return `${dateStr} в ${timeStr || ''}`;
             const formattedDate = d.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
             return `${formattedDate} в ${timeStr || ''}`;
+        },
+        repeatRide() {
+            this.$router.push({
+                path: '/create',
+                query: {
+                    role: this.isDriver ? 'driver' : 'passenger',
+                    from: this.ride?.from_city || '',
+                    to: this.ride?.to_city || '',
+                    time: this.ride?.time || '',
+                    price: this.ride?.price || '',
+                    seats: this.ride?.seats || '',
+                    fromAddress: this.ride?.from_address || '',
+                    toAddress: this.ride?.to_address || '',
+                    allows_delivery: this.ride?.allows_delivery ? 'true' : 'false'
+                }
+            });
         }
     },
     computed: {
@@ -106,6 +155,16 @@ export default {
             if (!this.hasRowPrices) return this.ride.price;
             const prices = Object.values(this.ride.row_prices).filter(p => p > 0);
             return Math.min(...prices, this.ride.price);
+        },
+        isPastRide() {
+            if (!this.ride) return false;
+            // A ride is past if it's explicitly completed or cancelled, 
+            // or if its date+time is strictly in the past by local time.
+            if (this.ride.status === 'completed' || this.ride.status === 'cancelled') return true;
+            
+            const time = this.ride.time || '00:00:00';
+            const rideDate = new Date(`${this.ride.date}T${time}`);
+            return new Date() > rideDate;
         }
     },
     mounted() {
@@ -246,7 +305,10 @@ export default {
                     <div v-if="!ride.is_passenger_entry && ride.vehicle" class="mt-6 p-4 bg-white rounded-2xl shadow-soft border border-gray-100/50 flex items-center space-x-4">
                         <div class="w-10 h-10 bg-slate-50 rounded-xl flex items-center justify-center text-xl shadow-inner">
                             <svg xmlns="http://www.w3.org/2000/svg" class="w-6 h-6 text-slate-400" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                                <path stroke-linecap="round" stroke-linejoin="round" d="M13 16H7v-3l2-5h8l2 5v3h-2M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                                <path stroke-linecap="round" stroke-linejoin="round" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+          <circle cx="7" cy="17" r="2" />
+          <path stroke-linecap="round" stroke-linejoin="round" d="M9 17h6" />
+          <circle cx="17" cy="17" r="2" />
                             </svg>
                         </div>
                         <div>
@@ -295,7 +357,25 @@ export default {
 
                   <!-- Action Button -->
                   <div class="mt-8 mb-6">
-                      <template v-if="ride.is_passenger_entry">
+                      <template v-if="isPastRide">
+                          <button 
+                             @click="repeatRide"
+                             class="w-full py-4 rounded-2xl font-bold text-lg shadow-xl bg-slate-100 text-slate-800 shadow-slate-100/30 hover:bg-slate-200 transition-all flex items-center justify-center space-x-2"
+                          >
+                             <span>Повторить поездку</span>
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
+                          </button>
+                      </template>
+                      <template v-else-if="ride.is_passenger_entry">
+                          <button 
+                             v-if="matchingDriverRides.length > 0"
+                             @click="shareRide(matchingDriverRides[0].id)"
+                             class="w-full py-4 rounded-2xl font-bold text-lg shadow-xl bg-blue-500 text-white shadow-blue-500/30 hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center space-x-2 mb-4"
+                          >
+                             <span>Предложить свою поездку</span>
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" /></svg>
+                          </button>
+                          
                           <router-link 
                             :to="{ 
                                 path: '/create', 
@@ -309,7 +389,7 @@ export default {
                             }"
                             class="w-full py-4 rounded-2xl font-bold text-lg shadow-xl bg-slate-900 text-white shadow-slate-900/30 hover:shadow-2xl hover:-translate-y-1 transition-all flex items-center justify-center space-x-2"
                           >
-                             <span>Создать похожую поездку</span>
+                             <span>{{ matchingDriverRides.length > 0 ? 'Создать другую поездку' : 'Создать похожую поездку' }}</span>
                              <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4" /></svg>
                           </router-link>
                       </template>

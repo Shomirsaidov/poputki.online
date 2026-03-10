@@ -39,7 +39,11 @@ export default {
                 front: '',
                 row2: '',
                 row3: ''
-            }
+            },
+            addReturnRide: false,
+            returnDate: '',
+            returnTime: '',
+            returnPrice: ''
         }
     },
     async mounted() {
@@ -68,6 +72,11 @@ export default {
         if (query.to) this.toCity = query.to;
         if (query.date) this.date = query.date;
         if (query.time) this.time = query.time;
+        if (query.price) this.price = parseInt(query.price);
+        if (query.seats) this.seats = parseInt(query.seats);
+        if (query.fromAddress) this.fromAddress = query.fromAddress;
+        if (query.toAddress) this.toAddress = query.toAddress;
+        if (query.allows_delivery) this.allows_delivery = query.allows_delivery === 'true';
         if (query.role) {
             this.rideRole = query.role;
             this.step = 2; // Jump to form if role is pre-selected
@@ -122,6 +131,17 @@ export default {
                 this.showAlert('Заполните поля', `Пожалуйста, заполните: ${missing.join(', ')}`, 'warning');
                 return;
             }
+
+            if (this.addReturnRide) {
+                const missingReturn = [];
+                if (!this.returnDate) missingReturn.push('Дата (обратно)');
+                if (!this.returnTime) missingReturn.push('Время (обратно)');
+                if (this.rideRole === 'driver' && this.returnPrice === '') missingReturn.push('Цена (обратно)');
+                if (missingReturn.length > 0) {
+                    this.showAlert('Заполните поля', `Для обратной поездки заполните: ${missingReturn.join(', ')}`, 'warning');
+                    return;
+                }
+            }
             
             // Price Limit Check
             if (this.priceRange) {
@@ -175,6 +195,17 @@ export default {
           if (missing.length > 0) {
               this.showAlert('Заполните поля', `Пожалуйста, заполните: ${missing.join(', ')}`, 'warning');
               return;
+          }
+
+          if (this.addReturnRide) {
+              const missingReturn = [];
+              if (!this.returnDate) missingReturn.push('Дата (обратно)');
+              if (!this.returnTime) missingReturn.push('Время (обратно)');
+              if (this.rideRole === 'driver' && this.returnPrice === '') missingReturn.push('Цена (обратно)');
+              if (missingReturn.length > 0) {
+                  this.showAlert('Заполните поля', `Для обратной поездки заполните: ${missingReturn.join(', ')}`, 'warning');
+                  return;
+              }
           }
 
           // Price Limit Check (Double check)
@@ -237,6 +268,21 @@ export default {
             this.errorMessage = '';
             
             await api.post('/rides', payload);
+            
+            if (this.addReturnRide) {
+                const returnPayload = {
+                  ...payload,
+                  from_city: this.toCity,
+                  to_city: this.fromCity,
+                  from_address: this.toAddress,
+                  to_address: this.fromAddress,
+                  date: this.returnDate,
+                  time: this.returnTime,
+                  price: this.rideRole === 'driver' ? parseInt(this.returnPrice) : 0,
+                  row_prices: null // Only allow base price for return to keep it simple
+                };
+                await api.post('/rides', returnPayload);
+            }
             
             // Show success and redirect
             this.$router.push({ path: '/search', query: { from: this.fromCity, to: this.toCity, date: this.date, success: 'true', message: this.rideRole === 'driver' ? 'Поездка создана!' : 'Заявка создана!' } });
@@ -302,7 +348,10 @@ export default {
                 <div class="absolute inset-0 bg-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
                 <div class="w-16 h-16 rounded-2xl bg-yellow-100 text-yellow-600 flex items-center justify-center text-3xl z-10">
                     <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
-                        <path stroke-linecap="round" stroke-linejoin="round" d="M13 16H7v-3l2-5h8l2 5v3h-2M9 17a2 2 0 11-4 0 2 2 0 014 0zM19 17a2 2 0 11-4 0 2 2 0 014 0z" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" />
+                        <circle cx="7" cy="17" r="2" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M9 17h6" />
+                        <circle cx="17" cy="17" r="2" />
                     </svg>
                 </div>
                 <div class="z-10">
@@ -314,7 +363,14 @@ export default {
 
              <button @click="selectRole('passenger')" class="group p-8 rounded-[32px] border-2 border-gray-100 bg-white hover:border-yellow-400 transition-all flex items-center space-x-6 text-left relative overflow-hidden">
                  <div class="absolute inset-0 bg-yellow-50 opacity-0 group-hover:opacity-100 transition-opacity"></div>
-                <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl z-10">👋</div>
+                <div class="w-16 h-16 rounded-2xl bg-blue-100 text-blue-600 flex items-center justify-center text-3xl z-10">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="w-8 h-8" fill="none" viewBox="0 0 24 24" stroke="currentColor" stroke-width="2">
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+                        <circle cx="9" cy="7" r="4" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M19 8v6" />
+                        <path stroke-linecap="round" stroke-linejoin="round" d="M22 11h-6" />
+                    </svg>
+                </div>
                 <div class="z-10">
                     <h3 class="font-bold text-xl text-slate-800">Я Пассажир</h3>
                     <p class="text-slate-500 text-sm mt-1">Ищу машину, чтобы доехать до места</p>
@@ -489,6 +545,63 @@ export default {
                     <div class="flex items-center space-x-2 bg-white px-3 py-1.5 rounded-xl border border-gray-200">
                         <input v-model="rowPrices.row3" type="number" :placeholder="price" class="w-12 text-right bg-transparent outline-none font-bold text-slate-800 text-sm" />
                         <span class="text-gray-400 text-xs">с.</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+      </section>
+
+      <!-- Return Ride Toggle -->
+      <section class="mt-4">
+        <div class="flex items-center justify-between p-4 bg-white rounded-2xl shadow-sm border border-gray-100">
+            <div class="flex flex-col">
+                <span class="text-slate-600 font-bold text-sm">Добавить обратную поездку</span>
+                <span class="text-xs text-gray-400">Сразу опубликовать поездку обратно</span>
+            </div>
+            <button 
+              @click="addReturnRide = !addReturnRide" 
+              class="w-14 h-8 rounded-full transition-colors relative shrink-0 ml-4"
+              :class="addReturnRide ? 'bg-yellow-400' : 'bg-gray-200'"
+            >
+              <div 
+                class="absolute top-1 w-6 h-6 bg-white rounded-full transition-all shadow-sm"
+                :class="addReturnRide ? 'left-7' : 'left-1'"
+              ></div>
+            </button>
+        </div>
+
+        <!-- Return Form Fields -->
+        <div v-if="addReturnRide" class="mt-4 p-5 bg-white rounded-2xl border border-yellow-200 space-y-4 shadow-sm relative overflow-hidden">
+            <div class="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
+            <h3 class="font-bold text-sm text-slate-800 mb-2">Обратно: <span v-if="toCity && fromCity">{{ toCity }} ➡ {{ fromCity }}</span><span v-else>Выберите маршрут</span></h3>
+            
+            <div class="grid grid-cols-2 gap-4">
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Дата</label>
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-center focus-within:ring-2 focus-within:ring-yellow-400/20">
+                        <input v-model="returnDate" type="date" class="w-full bg-transparent outline-none text-slate-700 font-medium text-sm" />
+                    </div>
+                </div>
+                <div class="space-y-2">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1">Время</label>
+                    <div class="bg-gray-50 p-3 rounded-xl border border-gray-100 flex items-center focus-within:ring-2 focus-within:ring-yellow-400/20">
+                        <input v-model="returnTime" type="time" class="w-full bg-transparent outline-none text-slate-700 font-medium text-sm" />
+                    </div>
+                </div>
+            </div>
+            
+            <div v-if="rideRole === 'driver'" class="pt-2">
+                <div class="flex justify-between items-center">
+                    <label class="text-xs font-bold text-gray-400 uppercase tracking-wider ml-1 mt-1">Цена за место</label>
+                    <div class="flex items-center space-x-2 bg-gray-50 px-3 py-2 rounded-xl border border-gray-100 focus-within:ring-2 focus-within:ring-yellow-400/20">
+                        <input 
+                            v-model="returnPrice" 
+                            type="number" 
+                            inputmode="numeric"
+                            :placeholder="price || '0'" 
+                            class="w-16 text-right bg-transparent outline-none font-bold text-slate-800" 
+                        />
+                        <span class="text-gray-400 text-sm font-medium">с.</span>
                     </div>
                 </div>
             </div>
