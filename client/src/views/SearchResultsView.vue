@@ -1,5 +1,5 @@
-<script>
 import api from '../api';
+import { getTelegramUser, getTelegramInitData } from '../telegram';
 
 export default {
   data() {
@@ -115,6 +115,31 @@ export default {
       const prices = Object.values(rowPrices).filter(p => p > 0);
       if (prices.length === 0) return ride.price;
       return Math.min(...prices, ride.price);
+    },
+    async syncTelegram() {
+      const tgUser = getTelegramUser();
+      if (!tgUser) return;
+      
+      const user = JSON.parse(localStorage.getItem('user') || 'null');
+      try {
+        const res = await api.post('/auth/telegram-login', {
+          id: tgUser.id,
+          first_name: tgUser.first_name,
+          last_name: tgUser.last_name,
+          username: tgUser.username,
+          photo_url: tgUser.photo_url,
+          userId: user?.id,
+          initData: getTelegramInitData()
+        });
+
+        if (res.data.user) {
+          localStorage.setItem('user', JSON.stringify(res.data.user));
+          if (res.data.token) localStorage.setItem('token', res.data.token);
+          this.user = res.data.user;
+        }
+      } catch (e) {
+        console.error("Sync TG error:", e);
+      }
     }
   },
   mounted() {
@@ -131,6 +156,7 @@ export default {
     }
     this.fetchCities();
     this.search();
+    this.syncTelegram();
   }
 };
 </script>

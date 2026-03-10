@@ -137,8 +137,8 @@ router.beforeEach(async (to, from, next) => {
                     localStorage.setItem('token', data.token);
                     localStorage.setItem('user', JSON.stringify(data.user));
 
-                    // Only force redirect if missing phone AND not already on auth
-                    if ((data.user.isNew || !data.user.phone) && to.name !== 'auth') {
+                    // Force redirect if registration is incomplete (missing phone, age, or name)
+                    if (data.user.isNew && to.name !== 'auth') {
                         router.push({ name: 'auth', query: { tg_complete: 1 } });
                     }
                 }
