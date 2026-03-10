@@ -119,11 +119,12 @@ export default {
     },
     async syncTelegram() {
       const tgUser = getTelegramUser();
+      console.log("SearchResultsView: syncTelegram triggered. tgUser:", tgUser);
       if (!tgUser) return;
       
       const user = JSON.parse(localStorage.getItem('user') || 'null');
       try {
-        const res = await api.post('/auth/telegram-login', {
+        const payload = {
           id: tgUser.id,
           first_name: tgUser.first_name,
           last_name: tgUser.last_name,
@@ -131,7 +132,10 @@ export default {
           photo_url: tgUser.photo_url,
           userId: user?.id,
           initData: getTelegramInitData()
-        });
+        };
+        console.log("SearchResultsView: sending sync payload:", payload);
+        const res = await api.post('/auth/telegram-login', payload);
+        console.log("SearchResultsView: sync response:", res.data);
 
         if (res.data.user) {
           localStorage.setItem('user', JSON.stringify(res.data.user));
@@ -139,7 +143,7 @@ export default {
           this.user = res.data.user;
         }
       } catch (e) {
-        console.error("Sync TG error:", e);
+        console.error("SearchResultsView: Sync TG error:", e);
       }
     }
   },
