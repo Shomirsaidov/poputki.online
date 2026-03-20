@@ -55,7 +55,17 @@ export default {
         },
         totalPrice() {
             if (!this.ticket) return 0;
-            return this.ticket.price * this.passengerCount;
+            const premiumSeatNums = this.ticket.premiumSeats || [];
+            const premiumPrice = this.ticket.premium_price || this.ticket.price;
+            let total = 0;
+            for (const seatNum of this.selectedSeats) {
+                total += premiumSeatNums.includes(seatNum) ? premiumPrice : this.ticket.price;
+            }
+            // If no seats selected yet, show estimate for regular price
+            if (this.selectedSeats.length === 0) {
+                return this.ticket.price * this.passengerCount;
+            }
+            return total;
         },
         canProceedStep1() {
             return this.selectedSeats.length === this.passengerCount;
@@ -268,6 +278,7 @@ export default {
                             <div class="text-right">
                                 <div class="text-xs text-gray-400 font-medium">Сумма (1 пасс)</div>
                                 <div class="font-bold text-blue-600 text-lg">{{ ticket.price }} с.</div>
+                                <div v-if="ticket.premium_price && ticket.bus_type === 'double'" class="text-xs text-amber-500 font-bold">★ {{ ticket.premium_price }} с.</div>
                                 <div class="text-xs text-gray-400">{{ availableSeats }} из {{ ticket.total_seats }} мест</div>
                             </div>
                         </div>
@@ -303,8 +314,13 @@ export default {
                                 :bookedSeats="bookedSeats"
                                 :seatGenders="ticket.seatGenders"
                                 :totalSeats="ticket.total_seats"
+                                :floor1Seats="ticket.floor1_seats || 20"
+                                :floor2Seats="ticket.floor2_seats || 56"
                                 :maxSelectable="passengerCount"
                                 :busType="ticket.bus_type"
+                                :premiumSeats="ticket.premiumSeats || []"
+                                :premiumPrice="ticket.premium_price || 0"
+                                :regularPrice="ticket.price || 0"
                             />
                         </div>
 
@@ -498,8 +514,9 @@ export default {
                                     <div>
                                         <div class="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1.5">Места</div>
                                         <div class="flex gap-1 flex-wrap">
-                                            <span v-for="seat in selectedSeats" :key="seat" class="px-2 py-0.5 bg-blue-50 text-blue-600 text-[11px] font-black rounded-md border border-blue-100">
-                                                №{{ seat }}
+                                            <span v-for="seat in selectedSeats" :key="seat" class="px-2 py-0.5 text-[11px] font-black rounded-md border"
+                                                :class="(ticket.premiumSeats || []).includes(seat) ? 'bg-amber-50 text-amber-600 border-amber-200' : 'bg-blue-50 text-blue-600 border-blue-100'">
+                                                №{{ seat }}<span v-if="(ticket.premiumSeats || []).includes(seat)" class="ml-0.5">★</span>
                                             </span>
                                         </div>
                                     </div>

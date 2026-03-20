@@ -29,7 +29,10 @@ export default {
                 arrival_time: '',
                 duration_minutes: '',
                 price: '',
-                total_seats: 44,
+                premium_price: '',
+                total_seats: 53,
+                floor1_seats: 20,
+                floor2_seats: 56,
                 bus_type: 'single',
                 passenger_comments: '',
                 intermediate_stops: []
@@ -39,8 +42,22 @@ export default {
             navItems: [
                 { id: 'tickets', label: 'Мои рейсы' },
                 { id: 'create', label: 'Создать рейс' },
+                { id: 'create-booking', label: 'Создать бронь' },
                 { id: 'bookings', label: 'Бронирования' }
-            ]
+            ],
+            bookingSearch: '',
+            isEditingTicket: false,
+            editingTicketId: null,
+            bookingForm: {
+                bus_ticket_id: '',
+                passenger_name: '', // For manual entry
+                phone: '',
+                passenger_count: 1,
+                seat_numbers: [],
+                passengers_data: [
+                    { lastName: '', firstName: '', middleName: '', gender: 'male', docType: 'Паспорт РТ', docNumber: '', birthDate: '', citizenship: 'Таджикистан' }
+                ]
+            }
         }
     },
     methods: {
@@ -73,7 +90,7 @@ export default {
         async fetchCities() {
             if (this.cities.length > 0) return;
             try {
-                const res = await api.get('/general/cities');
+                const res = await api.get('/general/cities', { params: { type: 'bus' } });
                 this.cities = res.data;
             } catch (e) { console.error('Error fetching cities', e); }
         },
@@ -119,7 +136,12 @@ export default {
             if (!this.busForm.arrival_time) e.arrival_time = 'Укажите время прибытия';
             if (!this.busForm.duration_minutes || this.busForm.duration_minutes <= 0) e.duration_minutes = 'Укажите длительность';
             if (!this.busForm.price || this.busForm.price <= 0) e.price = 'Укажите цену';
-            if (!this.busForm.total_seats || this.busForm.total_seats < 1) e.total_seats = 'Укажите количество мест';
+            if (this.busForm.bus_type === 'double') {
+                if (!this.busForm.floor1_seats || this.busForm.floor1_seats < 1) e.floor1_seats = 'Укажите кол-во мест 1 этажа';
+                if (!this.busForm.floor2_seats || this.busForm.floor2_seats < 1) e.floor2_seats = 'Укажите кол-во мест 2 этажа';
+            } else {
+                if (!this.busForm.total_seats || this.busForm.total_seats < 1) e.total_seats = 'Укажите количество мест';
+            }
             this.busErrors = e;
             return Object.keys(e).length === 0;
         },
@@ -130,13 +152,24 @@ export default {
             }
             this.loading = true;
             try {
-                await api.post('/bus-tickets', {
+                const submitData = {
                     ...this.busForm,
                     operator_id: this.user.id,
                     duration_minutes: Number(this.busForm.duration_minutes),
                     price: Number(this.busForm.price),
-                    total_seats: Number(this.busForm.total_seats)
-                });
+                    premium_price: this.busForm.premium_price ? Number(this.busForm.premium_price) : null
+                };
+                if (this.busForm.bus_type === 'double') {
+                    submitData.floor1_seats = Number(this.busForm.floor1_seats);
+                    submitData.floor2_seats = Number(this.busForm.floor2_seats);
+                    submitData.total_seats = submitData.floor1_seats + submitData.floor2_seats;
+                } else {
+                    submitData.total_seats = Number(this.busForm.total_seats);
+                    submitData.floor1_seats = null;
+                    submitData.floor2_seats = null;
+                    submitData.premium_price = null;
+                }
+                await api.post('/bus-tickets', submitData);
                 alert('Рейс успешно создан!');
                 
                 // Reset form
@@ -144,7 +177,8 @@ export default {
                     transport_company: '', from_city: '', from_address: '',
                     to_city: '', to_address: '', departure_date: '',
                     departure_time: '', arrival_date: '', arrival_time: '',
-                    duration_minutes: '', price: '', total_seats: 44,
+                    duration_minutes: '', price: '', premium_price: '', total_seats: 53,
+                    floor1_seats: 20, floor2_seats: 56,
                     bus_type: 'single', passenger_comments: '',
                     intermediate_stops: []
                 };
@@ -155,6 +189,136 @@ export default {
             } finally {
                 this.loading = false;
             }
+        },
+        async deleteTicket(id) {
+            if (!confirm('Удалить этот рейс?')) return;
+            try {
+                await api.delete(`/bus-admin/tickets/${id}`);
+                this.fetchTickets();
+            } catch (e) { alert('Ошибка при удалении'); }
+        },
+        editTicket(ticket) {
+            this.isEditingTicket = true;
+            this.editingTicketId = ticket.id;
+            this.busForm = { 
+                ...ticket,
+                intermediate_stops: ticket.intermediate_stops || []
+            };
+            this.activeTab = 'create';
+        },
+        async updateBusTicket() {
+            if (!this.validateBusForm()) return;
+            this.loading = true;
+            try {
+                const updateData = {
+                    ...this.busForm,
+                    duration_minutes: Number(this.busForm.duration_minutes),
+                    price: Number(this.busForm.price),
+                    premium_price: this.busForm.premium_price ? Number(this.busForm.premium_price) : null
+                };
+                if (this.busForm.bus_type === 'double') {
+                    updateData.floor1_seats = Number(this.busForm.floor1_seats);
+                    updateData.floor2_seats = Number(this.busForm.floor2_seats);
+                    updateData.total_seats = updateData.floor1_seats + updateData.floor2_seats;
+                } else {
+                    updateData.total_seats = Number(this.busForm.total_seats);
+                    updateData.floor1_seats = null;
+                    updateData.floor2_seats = null;
+                    updateData.premium_price = null;
+                }
+                await api.put(`/bus-admin/tickets/${this.editingTicketId}`, updateData);
+                alert('Рейс успешно обновлен!');
+                this.isEditingTicket = false;
+                this.editingTicketId = null;
+                this.activeTab = 'tickets';
+            } catch (e) { alert('Ошибка при обновлении'); } finally { this.loading = false; }
+        },
+        initBooking(ticketId) {
+            this.bookingForm.bus_ticket_id = ticketId;
+            this.activeTab = 'create-booking';
+        },
+        addPassenger() {
+            this.bookingForm.passengers_data.push({ lastName: '', firstName: '', middleName: '', gender: 'male', docType: 'Паспорт РТ', docNumber: '', birthDate: '', citizenship: 'Таджикистан' });
+            this.bookingForm.passenger_count++;
+        },
+        removePassenger(index) {
+            this.bookingForm.passengers_data.splice(index, 1);
+            this.bookingForm.passenger_count--;
+        },
+        async submitManualBooking() {
+            const f = this.bookingForm;
+            if (!f.bus_ticket_id || !f.passenger_name || !f.phone) {
+                alert('Заполните основные данные (Рейс, ФИО, Телефон)');
+                return;
+            }
+            this.loading = true;
+            try {
+                // Determine seat numbers if not manually provided
+                const ticket = this.tickets.find(t => t.id === f.bus_ticket_id);
+                if (!ticket) throw new Error('Рейс не найден');
+                
+                const reserved = ticket.reserved_seats || [];
+                const needed = f.passenger_count;
+                const available = [];
+                for (let i = 1; i <= ticket.total_seats; i++) {
+                    if (!reserved.includes(i)) available.push(i);
+                    if (available.length === needed) break;
+                }
+                
+                if (available.length < needed) {
+                    alert('Нет свободных мест');
+                    return;
+                }
+
+                await api.post('/bus-admin/bookings/manual', {
+                    bus_ticket_id: f.bus_ticket_id,
+                    operator_id: this.user.id,
+                    passenger_name: f.passenger_name,
+                    seat_numbers: available,
+                    passengers_data: f.passengers_data,
+                    phone: f.phone
+                });
+
+                alert('Бронь успешно создана!');
+                // Reset
+                this.bookingForm = {
+                    bus_ticket_id: '', passenger_name: '', phone: '',
+                    passenger_count: 1, seat_numbers: [],
+                    passengers_data: [{ lastName: '', firstName: '', middleName: '', docType: 'Паспорт РТ', docNumber: '', birthDate: '', citizenship: 'Таджикистан' }]
+                };
+                this.activeTab = 'bookings';
+            } catch (e) {
+                alert(e.response?.data?.error || 'Ошибка при бронировании');
+            } finally { this.loading = false; }
+        }
+    },
+    computed: {
+        filteredBookings() {
+            // Return bookings without flattening. We add some context properties for display.
+            const enhanced = this.bookings.map(b => {
+                return {
+                    ...b,
+                    ticket_context: b.ticket_context || '',
+                };
+            });
+
+            if (!this.bookingSearch) return enhanced;
+            const s = this.bookingSearch.toLowerCase();
+            return enhanced.filter(b => {
+                // Search by main contact name or phone
+                if ((b.passenger_name || '').toLowerCase().includes(s)) return true;
+                if ((b.passenger_phone || '').toLowerCase().includes(s)) return true;
+                
+                // Search by nested passenger data
+                const pData = b.passengers_data || [];
+                for (const p of pData) {
+                    const fullName = `${p.lastName || ''} ${p.firstName || ''} ${p.middleName || ''}`.toLowerCase();
+                    const docInfo = `${p.docType || ''} ${p.docNumber || ''}`.toLowerCase();
+                    if (fullName.includes(s) || docInfo.includes(s)) return true;
+                }
+                
+                return false;
+            });
         }
     },
     watch: {
@@ -250,7 +414,7 @@ export default {
                     <button 
                         v-for="item in navItems" 
                         :key="item.id"
-                        @click="activeTab = item.id; mobileMenuOpen = false"
+                        @click="activeTab = item.id; mobileMenuOpen = false; if(item.id !== 'create') { isEditingTicket = false; editingTicketId = null; }"
                         class="w-full px-4 py-3 rounded-xl flex items-center space-x-3 transition-all group"
                         :class="activeTab === item.id ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'"
                     >
@@ -280,6 +444,15 @@ export default {
                         <div v-for="ticket in tickets" :key="ticket.id" class="bg-slate-800 rounded-3xl border border-slate-700 p-6 lg:p-8 flex flex-col justify-between shadow-2xl overflow-hidden relative group">
                             <div class="absolute right-0 top-0 w-32 h-32 bg-amber-500/5 rounded-bl-[100px] -z-0"></div>
                             
+                            <div class="absolute top-4 right-4 flex space-x-2 z-20">
+                                <button @click="editTicket(ticket)" class="p-2 bg-slate-700/50 hover:bg-amber-500 hover:text-slate-900 rounded-xl transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                </button>
+                                <button @click="deleteTicket(ticket.id)" class="p-2 bg-slate-700/50 hover:bg-red-500 hover:text-white rounded-xl transition-all">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v2m3 4h.01" /></svg>
+                                </button>
+                            </div>
+
                             <div class="relative z-10">
                                 <div class="flex justify-between items-start mb-6">
                                     <div class="flex space-x-3 items-center">
@@ -320,7 +493,10 @@ export default {
                                         / {{ ticket.total_seats }} свободно
                                     </span>
                                 </div>
-                                <span class="text-xs font-bold px-3 py-1 bg-slate-700 rounded-lg text-slate-300">{{ ticket.transport_company }}</span>
+                                <div class="flex space-x-2">
+                                    <button @click="initBooking(ticket.id)" class="text-xs font-bold px-3 py-1 bg-amber-500 text-slate-900 rounded-lg hover:bg-amber-600 transition-all">Забронировать</button>
+                                    <span class="text-xs font-bold px-3 py-1 bg-slate-700 rounded-lg text-slate-300">{{ ticket.transport_company }}</span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -328,72 +504,171 @@ export default {
 
                 <!-- Bookings section -->
                 <section v-if="activeTab === 'bookings'" class="space-y-6 lg:space-y-8">
-                     <h2 class="text-2xl lg:text-3xl font-bold">Бронирования на ваши рейсы</h2>
+                     <div class="flex justify-between items-center">
+                         <h2 class="text-2xl lg:text-3xl font-bold">Бронирования</h2>
+                         <div class="relative w-64">
+                             <input v-model="bookingSearch" placeholder="Поиск по имени..." class="w-full bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 text-sm outline-none focus:border-amber-500" />
+                             <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4 absolute right-3 top-1/2 -translate-y-1/2 text-slate-500" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                         </div>
+                     </div>
+
                      <div v-if="loading" class="text-slate-500">Загрузка...</div>
-                     <div v-else-if="bookings.length === 0" class="bg-slate-800 p-8 rounded-[32px] border border-slate-700 text-center text-slate-400">
-                        Бронирований пока нет.
+                     <div v-else-if="filteredBookings.length === 0" class="bg-slate-800 p-8 rounded-[32px] border border-slate-700 text-center text-slate-400">
+                        Бронирований не найдено.
                     </div>
-                    <div v-else class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                        <div v-for="booking in bookings" :key="booking.id" class="bg-slate-800 p-5 lg:p-6 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                            <div class="flex justify-between items-start mb-4">
-                                <div>
-                                    <p class="text-xs font-bold text-amber-500 uppercase tracking-widest">{{ booking.ticket_context }}</p>
-                                    <h4 class="font-bold text-lg mt-1 text-slate-100">{{ booking.passenger_name || 'Неизвестный' }}</h4>
-                                    <p class="text-slate-400 text-sm font-mono mt-0.5">{{ booking.passenger_phone }}</p>
-                                </div>
-                                <div class="bg-emerald-500/10 px-3 py-1.5 rounded-xl border border-emerald-500/20 text-right">
-                                    <span class="text-emerald-400 font-bold block">{{ booking.total_price }} с.</span>
-                                    <span class="text-[10px] text-emerald-500/70 uppercase font-black tracking-wider block mt-0.5">Оплачено</span>
-                                </div>
-                            </div>
-                            <div class="pt-4 border-t border-slate-700/50">
-                                <p class="text-sm text-slate-300 mb-2">Места: <span class="font-bold text-amber-500">{{ booking.seat_numbers.join(', ') }}</span> ({{ booking.passenger_count }} чел.)</p>
-                                
-                                <!-- Detailed Passengers List -->
-                                <div v-if="booking.passengers_data && booking.passengers_data.length" class="space-y-3 mt-4">
-                                    <div v-for="(p, idx) in booking.passengers_data" :key="idx" 
-                                         class="bg-slate-900/50 p-4 rounded-2xl border border-slate-700/50 hover:border-amber-500/30 transition-all">
-                                        <div class="flex justify-between items-center mb-3">
-                                            <div class="flex items-center gap-2">
-                                                <div class="w-6 h-6 rounded-lg bg-amber-500/10 flex items-center justify-center text-[10px] font-black text-amber-500">
-                                                    {{ idx + 1 }}
+                    <div v-else class="bg-slate-800 rounded-[32px] border border-slate-700 overflow-hidden shadow-2xl">
+                        <div class="overflow-x-auto">
+                            <table class="w-full text-left border-collapse">
+                                <thead>
+                                    <tr class="bg-slate-700/30 text-[10px] font-black uppercase tracking-widest text-slate-500">
+                                        <th class="px-6 py-4">Рейс / Контакт</th>
+                                        <th class="px-6 py-4">ДЕТАЛИ ПАССАЖИРОВ</th>
+                                        <th class="px-6 py-4">Оплата</th>
+                                    </tr>
+                                </thead>
+                                <tbody class="divide-y divide-slate-700/50">
+                                    <tr v-for="b in filteredBookings" :key="b.id" class="hover:bg-slate-700/20 transition-colors">
+                                        <td class="px-6 py-4 align-top w-1/4">
+                                            <div class="font-bold text-slate-100 text-sm mb-1">{{ b.passenger_name || 'Неизвестный' }}</div>
+                                            <div class="text-[10px] font-medium text-slate-400 mb-1 leading-snug break-words">{{ b.ticket_context }}</div>
+                                            <div class="text-[10px] font-mono text-amber-500/70">{{ b.passenger_phone }}</div>
+                                        </td>
+                                        <td class="px-6 py-4">
+                                            <div class="space-y-3">
+                                                <div v-for="(p, idx) in b.passengers_data || []" :key="idx" class="bg-slate-800/80 p-4 rounded-2xl border border-slate-700/50 flex flex-col gap-2 relative">
+                                                    <div class="absolute top-3 right-3 text-[10px] font-bold text-amber-500 px-2 py-1 bg-amber-500/10 rounded-lg">
+                                                        Место: {{ (b.seat_numbers && b.seat_numbers[idx]) ? b.seat_numbers[idx] : '—' }}
+                                                    </div>
+                                                    <div class="font-bold text-slate-100 text-sm pr-16 bg-slate-900/50 p-2 rounded-xl">
+                                                        <span class="text-slate-500 font-medium text-xs mr-2">{{ idx + 1 }}.</span>
+                                                        {{ p.lastName }} {{ p.firstName }} {{ p.middleName }}
+                                                    </div>
+                                                    <div class="grid grid-cols-2 gap-x-4 gap-y-2 text-[10px] text-slate-400 mt-1 px-1">
+                                                        <div class="flex items-center gap-1.5">
+                                                            <div class="w-4 text-slate-500 text-center">👁️</div>
+                                                            Пол: <span class="text-slate-200">{{ p.gender === 'male' ? 'Муж.' : (p.gender === 'female' ? 'Жен.' : '—') }}</span>
+                                                        </div>
+                                                        <div class="flex items-center gap-1.5">
+                                                            <div class="w-4 text-slate-500 text-center">📅</div>
+                                                            ДР: <span class="text-slate-200 font-medium">{{ p.birthDate || '—' }}</span>
+                                                        </div>
+                                                        <div class="col-span-2 flex flex-wrap items-center gap-1.5">
+                                                            <div class="w-4 text-slate-500 text-center">📄</div>
+                                                            Документ: <span class="text-slate-200">{{ p.docType || '—' }} {{ p.docNumber || '—' }}</span>
+                                                            <span class="ml-auto text-slate-500 text-[9px] uppercase tracking-wider">{{ p.citizenship || '—' }}</span>
+                                                        </div>
+                                                    </div>
                                                 </div>
-                                                <span class="text-[10px] font-black text-slate-500 uppercase tracking-widest">Пассажир</span>
+                                                <!-- Fallback if no detailed passenger data is present -->
+                                                <div v-if="!b.passengers_data || b.passengers_data.length === 0" class="text-xs text-slate-500 italic p-3 bg-slate-800/50 rounded-xl border border-dashed border-slate-700">
+                                                    Детальные данные отсутствуют. Места: <span class="text-amber-500 font-bold">{{ (b.seat_numbers || []).join(', ') }}</span>
+                                                </div>
                                             </div>
-                                            <span v-if="booking.seat_numbers[idx]" class="text-[10px] font-black text-amber-500/80 bg-amber-500/5 px-2 py-0.5 rounded-md border border-amber-500/10">
-                                                МЕСТО {{ booking.seat_numbers[idx] }}
+                                        </td>
+                                        <td class="px-6 py-4 align-top w-[120px]">
+                                            <span class="text-[10px] font-black uppercase tracking-widest px-2 py-1 rounded-lg"
+                                                :class="b.total_price === 0 ? 'bg-blue-500/10 text-blue-400' : 'bg-emerald-500/10 text-emerald-400'">
+                                                {{ b.total_price === 0 ? 'Ручная' : 'Оплачено' }}
                                             </span>
-                                        </div>
-                                        
-                                        <div class="space-y-3">
-                                            <div>
-                                                <p class="text-[9px] text-slate-500 uppercase font-black tracking-tighter mb-0.5">ФИО</p>
-                                                <p class="text-sm font-bold text-slate-100 tracking-tight">{{ p.lastName }} {{ p.firstName }} {{ p.middleName }}</p>
-                                            </div>
-                                            
-                                            <div class="grid grid-cols-2 gap-4">
-                                                <div>
-                                                    <p class="text-[9px] text-slate-500 uppercase font-black tracking-tighter mb-0.5">Документ ({{ p.docType }})</p>
-                                                    <p class="text-xs font-mono font-bold text-amber-500 tracking-wider">{{ p.docNumber }}</p>
-                                                </div>
-                                                <div>
-                                                    <p class="text-[9px] text-slate-500 uppercase font-black tracking-tighter mb-0.5">Дата рождения / Г-во</p>
-                                                    <p class="text-xs text-slate-300 font-medium">{{ p.birthDate }} / {{ p.citizenship }}</p>
-                                                </div>
-                                            </div>
-                                        </div>
+                                        </td>
+                                    </tr>
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                </section>
+                <!-- Create Booking Section -->
+                <section v-if="activeTab === 'create-booking'" class="space-y-6 lg:space-y-8">
+                    <h2 class="text-2xl lg:text-3xl font-bold">Создать бронирование вручную</h2>
+
+                    <div class="bg-slate-800 rounded-[32px] border border-slate-700 p-6 lg:p-8 shadow-2xl space-y-6">
+                        <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Выберите рейс</label>
+                                <select v-model="bookingForm.bus_ticket_id" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none focus:border-amber-500">
+                                    <option value="" disabled>Рейс не выбран</option>
+                                    <option v-for="t in tickets" :key="'book-t-'+t.id" :value="t.id">
+                                        {{ t.from_city }} -> {{ t.to_city }} ({{ t.departure_date }} {{ t.departure_time }})
+                                    </option>
+                                </select>
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Имя основного контакта</label>
+                                <input v-model="bookingForm.passenger_name" placeholder="Имя Фамилия" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none focus:border-amber-500" />
+                            </div>
+                            <div class="space-y-2">
+                                <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Телефон</label>
+                                <input v-model="bookingForm.phone" placeholder="+992..." class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none focus:border-amber-500" />
+                            </div>
+                        </div>
+
+                        <div class="space-y-4 pt-6 border-t border-slate-700/50">
+                            <div class="flex justify-between items-center">
+                                <h3 class="text-sm font-bold text-slate-300">Данные пассажиров ({{ bookingForm.passenger_count }})</h3>
+                                <button @click="addPassenger" class="text-xs font-bold text-amber-500 hover:text-amber-400">+ Добавить</button>
+                            </div>
+                            <div v-for="(p, idx) in bookingForm.passengers_data" :key="idx" class="bg-slate-900/50 p-6 rounded-[24px] border border-slate-700/50 relative">
+                                <button v-if="idx > 0" @click="removePassenger(idx)" class="absolute top-4 right-4 text-red-400 hover:text-red-500">
+                                    <svg class="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/></svg>
+                                </button>
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4">
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Фамилия</label>
+                                        <input v-model="p.lastName" placeholder="Иванов" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Имя</label>
+                                        <input v-model="p.firstName" placeholder="Иван" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Отчество</label>
+                                        <input v-model="p.middleName" placeholder="Иванович" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Пол</label>
+                                        <select v-model="p.gender" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100 outline-none appearance-none cursor-pointer">
+                                            <option value="male">Мужской</option>
+                                            <option value="female">Женский</option>
+                                        </select>
                                     </div>
                                 </div>
-
-                                <p class="text-[10px] text-slate-500 mt-6 pt-4 border-t border-slate-700/30">Дата бронирования: {{ new Date(booking.created_at).toLocaleString() }}</p>
+                                <div class="grid grid-cols-1 md:grid-cols-4 gap-4 mt-4">
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Тип документа</label>
+                                        <select v-model="p.docType" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100">
+                                            <option>Паспорт РТ</option>
+                                            <option>Загранпаспорт</option>
+                                            <option>Свид. о рождении</option>
+                                        </select>
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Номер документа</label>
+                                        <input v-model="p.docNumber" placeholder="A0000000" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Дата рождения</label>
+                                        <input v-model="p.birthDate" type="date" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100" />
+                                    </div>
+                                    <div class="space-y-1">
+                                        <label class="text-[9px] text-slate-500 uppercase ml-1">Гражданство</label>
+                                        <input v-model="p.citizenship" placeholder="Таджикистан" class="w-full bg-slate-800 border-none rounded-xl p-3 text-sm text-slate-100" />
+                                    </div>
+                                </div>
                             </div>
+                        </div>
+
+                        <div class="flex justify-end pt-4">
+                            <button @click="submitManualBooking" :disabled="loading" class="px-8 py-3 bg-amber-500 text-slate-900 font-bold rounded-2xl shadow-lg hover:shadow-amber-500/20 transition-all flex items-center gap-2">
+                                <span v-if="loading" class="w-4 h-4 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></span>
+                                Создать бронирование
+                            </button>
                         </div>
                     </div>
                 </section>
 
                 <!-- Create Bus Section (Copied from Admin View) -->
                 <section v-if="activeTab === 'create'" class="space-y-6 lg:space-y-8">
-                    <h2 class="text-2xl lg:text-3xl font-bold">Опубликовать новый рейс</h2>
+                    <h2 class="text-2xl lg:text-3xl font-bold">{{ isEditingTicket ? 'Редактировать рейс' : 'Опубликовать новый рейс' }}</h2>
                     
                     <div class="bg-slate-800 rounded-[32px] border border-slate-700 p-6 lg:p-8 shadow-2xl space-y-8">
                         <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
@@ -478,23 +753,23 @@ export default {
                              <div class="space-y-2 flex flex-col">
                                 <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1 mb-2">Конфигурация автобуса</label>
                                 <div class="flex bg-slate-700/30 p-1.5 rounded-2xl border border-slate-600/50">
-                                    <button @click="busForm.bus_type = 'single'; busForm.total_seats = 44"
+                                    <button @click="busForm.bus_type = 'single'; busForm.total_seats = 53"
                                         :class="busForm.bus_type === 'single' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400'"
                                         class="flex-1 py-3 rounded-xl font-bold text-xs transition-all tracking-tighter uppercase whitespace-nowrap px-2"
                                     >
-                                        Обычный (44)
+                                        Обычный (53)
                                     </button>
-                                    <button @click="busForm.bus_type = 'double'; busForm.total_seats = 72"
+                                    <button @click="busForm.bus_type = 'double'; busForm.floor1_seats = 20; busForm.floor2_seats = 56; busForm.total_seats = 76"
                                         :class="busForm.bus_type === 'double' ? 'bg-amber-500 text-slate-900 shadow-lg' : 'text-slate-400'"
                                         class="flex-1 py-3 rounded-xl font-bold text-xs transition-all tracking-tighter uppercase whitespace-nowrap px-2"
                                     >
-                                        Двухэтажный (72)
+                                        Двухэтажный (76)
                                     </button>
                                 </div>
                             </div>
 
-                            <!-- Total Seats & Duration -->
-                             <div class="grid grid-cols-2 gap-4">
+                            <!-- Total Seats & Duration (single-floor) -->
+                             <div v-if="busForm.bus_type === 'single'" class="grid grid-cols-2 gap-4">
                                 <div class="space-y-2">
                                     <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Мест всего</label>
                                     <input v-model="busForm.total_seats" type="number" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none" />
@@ -503,6 +778,36 @@ export default {
                                     <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Длит (мин)</label>
                                     <input v-model="busForm.duration_minutes" type="number" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none" />
                                 </div>
+                             </div>
+
+                             <!-- Per-floor Seats & Duration (double-decker) -->
+                             <div v-if="busForm.bus_type === 'double'" class="space-y-4">
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div class="space-y-2">
+                                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">1 Этаж (мест)</label>
+                                        <input v-model="busForm.floor1_seats" type="number" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none" :class="{'border-red-500': busErrors.floor1_seats}" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">2 Этаж (мест)</label>
+                                        <input v-model="busForm.floor2_seats" type="number" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none" :class="{'border-red-500': busErrors.floor2_seats}" />
+                                    </div>
+                                    <div class="space-y-2">
+                                        <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Длит (мин)</label>
+                                        <input v-model="busForm.duration_minutes" type="number" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none" />
+                                    </div>
+                                </div>
+                                <div class="bg-slate-700/20 p-3 rounded-xl border border-slate-600/30">
+                                    <span class="text-[10px] font-bold text-slate-400 uppercase tracking-widest">Всего мест: </span>
+                                    <span class="text-sm font-bold text-amber-500">{{ (Number(busForm.floor1_seats) || 0) + (Number(busForm.floor2_seats) || 0) }}</span>
+                                </div>
+                             </div>
+
+                             <!-- Premium Price (double-decker only) -->
+                             <div v-if="busForm.bus_type === 'double'" class="space-y-2">
+                                <label class="text-[10px] font-black text-amber-400 uppercase tracking-widest ml-1">★ Цена за Премиум-место (с.)</label>
+                                <input v-model="busForm.premium_price" type="number" placeholder="0 = нет премиума" 
+                                    class="w-full bg-slate-700/50 border border-amber-500/30 rounded-2xl p-4 text-amber-400 font-bold text-xl outline-none focus:border-amber-500 transition-all shadow-inner" />
+                                <p class="text-[9px] text-slate-500 ml-1">Премиум-места: 69-76 (у столов, 1 этаж), 53-56 (зад, 2 этаж)</p>
                              </div>
                         </div>
 
@@ -543,12 +848,12 @@ export default {
                         <!-- Submit Button -->
                         <div class="flex justify-end pt-4">
                              <button 
-                                @click="submitBusTicket" 
+                                @click="isEditingTicket ? updateBusTicket() : submitBusTicket()" 
                                 :disabled="loading"
                                 class="px-12 py-4 rounded-2xl bg-amber-500 text-slate-900 font-bold text-lg shadow-xl shadow-amber-500/20 hover:shadow-amber-500/40 hover:-translate-y-1 active:scale-95 transition-all flex items-center gap-3 disabled:opacity-50"
                             >
                                 <span v-if="loading" class="w-5 h-5 border-2 border-slate-900/30 border-t-slate-900 rounded-full animate-spin"></span>
-                                {{ loading ? 'Создание...' : 'Опубликовать рейс' }}
+                                {{ loading ? (isEditingTicket ? 'Обновление...' : 'Создание...') : (isEditingTicket ? 'Обновить рейс' : 'Опубликовать рейс') }}
                             </button>
                         </div>
                     </div>

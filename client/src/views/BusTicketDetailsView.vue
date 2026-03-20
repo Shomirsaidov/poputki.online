@@ -123,6 +123,7 @@ export default {
                     <div>
                         <div class="text-xs font-bold text-gray-400 uppercase tracking-wider">Цена за 1 пассажира</div>
                         <div class="text-3xl font-bold text-slate-800 mt-1">{{ ticket.price }} <span class="text-lg text-gray-400 font-medium">с.</span></div>
+                        <div v-if="ticket.premium_price && ticket.bus_type === 'double'" class="text-sm font-bold text-amber-500 mt-1">★ Премиум: {{ ticket.premium_price }} с.</div>
                     </div>
                     <div class="text-right">
                         <div class="text-xs text-gray-400 font-medium">Мест</div>
