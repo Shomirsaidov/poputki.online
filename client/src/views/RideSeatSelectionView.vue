@@ -14,7 +14,7 @@ export default {
             loading: true,
             bookingLoading: false,
             selectedSeat: [],
-            bookingGender: null,
+            seatGenders: {},
             user: JSON.parse(localStorage.getItem('user') || 'null'),
             modal: {
                 show: false,
@@ -64,12 +64,16 @@ export default {
         },
         async bookSeat() {
             if (this.selectedSeat.length === 0) {
-                this.showAlert('Внимание', 'Пожалуйста, выберите место', 'warning');
+                this.showAlert('Внимание', 'Пожалуйста, выберите хотя бы одно место', 'warning');
                 return;
             }
-            if (!this.bookingGender) {
-                this.showAlert('Внимание', 'Пожалуйста, выберите пол', 'warning');
-                return;
+            
+            // Check if all selected seats have a gender assigned
+            for (const seatId of this.selectedSeat) {
+                if (!this.seatGenders[seatId]) {
+                    this.showAlert('Внимание', `Пожалуйста, выберите пол для места №${seatId}`, 'warning');
+                    return;
+                }
             }
 
             this.showConfirm(
@@ -79,11 +83,15 @@ export default {
                     this.modal.show = false;
                     this.bookingLoading = true;
                     try {
+                        const bookings = this.selectedSeat.map(seatId => ({
+                            seat_number: seatId,
+                            passenger_gender: this.seatGenders[seatId]
+                        }));
+
                         await api.post('/bookings', {
                             ride_id: this.ride.id,
                             passenger_id: this.user.id,
-                            seat_number: this.selectedSeat[0],
-                            passenger_gender: this.bookingGender
+                            seats: bookings // Bulk booking
                         });
                         this.showAlert('Успешно', 'Место успешно забронировано!', 'success', () => {
                             this.modal.show = false;
@@ -105,14 +113,21 @@ export default {
         },
         currentSeatPrice() {
             if (!this.ride || this.selectedSeat.length === 0) return 0;
-            if (!this.hasRowPrices) return this.ride.price;
             
-            const seatId = this.selectedSeat[0];
-            let row = 'row2';
-            if (seatId <= 2) row = 'front';
-            else if (seatId > 5) row = 'row3';
-            
-            return this.ride.row_prices[row] || this.ride.price;
+            let total = 0;
+            for (const seatId of this.selectedSeat) {
+                if (!this.hasRowPrices) {
+                    total += this.ride.price;
+                    continue;
+                }
+                
+                let row = 'row2';
+                if (seatId <= 2) row = 'front';
+                else if (seatId > 5) row = 'row3';
+                
+                total += this.ride.row_prices[row] || this.ride.price;
+            }
+            return total;
         }
     },
     mounted() {
@@ -154,39 +169,40 @@ export default {
                 :row-prices="ride.row_prices || {}"
             />
 
-            <!-- Gender Selection -->
-            <div v-if="selectedSeat.length > 0" class="space-y-4 animate-slide-up">
+            <!-- Multi-Seat Gender Selection -->
+            <div v-if="selectedSeat.length > 0" class="space-y-6 animate-slide-up pb-4">
                 <div class="flex flex-col space-y-1 ml-1">
-                    <label class="text-xs font-black text-slate-400 uppercase tracking-widest">Ваш пол</label>
-                    <p class="text-[10px] text-gray-400">Это поможет другим пассажирам при выборе мест</p>
+                    <label class="text-xs font-black text-slate-400 uppercase tracking-widest">Информация о пассажирах</label>
+                    <p class="text-[10px] text-gray-400">Выберите пол для каждого выбранного места</p>
                 </div>
-                <div class="grid grid-cols-2 gap-4">
-                    <button 
-                        @click="bookingGender = 'male'"
-                        class="group p-5 rounded-2xl border-2 font-bold transition-all flex flex-col items-center justify-center space-y-3 relative overflow-hidden"
-                        :class="bookingGender === 'male' ? 'border-blue-500 bg-blue-50 text-blue-700 shadow-lg shadow-blue-500/10' : 'border-white bg-white text-slate-400 shadow-sm hover:border-gray-200'"
-                    >
-                        <div class="w-12 h-12 flex items-center justify-center rounded-full bg-slate-50 group-hover:bg-blue-50 transition-colors" :class="{'bg-blue-100/50': bookingGender === 'male'}">
-                            <svg class="w-8 h-8 transition-all" :class="bookingGender === 'male' ? 'text-blue-600' : 'text-slate-300 group-hover:text-blue-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M14 2l4 4m0 0l-4 4m4-4h-6" :class="bookingGender === 'male' ? 'text-blue-800' : 'text-slate-400 opacity-40'" />
-                            </svg>
-                        </div>
-                        <span class="text-xs uppercase tracking-widest font-black">Мужчина</span>
-                    </button>
-                    <button 
-                        @click="bookingGender = 'female'"
-                        class="group p-5 rounded-2xl border-2 font-bold transition-all flex flex-col items-center justify-center space-y-3 relative overflow-hidden"
-                        :class="bookingGender === 'female' ? 'border-pink-500 bg-pink-50 text-pink-700 shadow-lg shadow-pink-500/10' : 'border-white bg-white text-slate-400 shadow-sm hover:border-gray-200'"
-                    >
-                        <div class="w-12 h-12 flex items-center justify-center rounded-full bg-slate-50 group-hover:bg-pink-50 transition-colors" :class="{'bg-pink-100/50': bookingGender === 'female'}">
-                            <svg class="w-8 h-8 transition-all" :class="bookingGender === 'female' ? 'text-pink-600' : 'text-slate-300 group-hover:text-pink-400'" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 2v4m0 0H8m4 0h4" :class="bookingGender === 'female' ? 'text-pink-800' : 'text-slate-400 opacity-40'" />
-                            </svg>
-                        </div>
-                        <span class="text-xs uppercase tracking-widest font-black">Женщина</span>
-                    </button>
+
+                <div v-for="seatId in selectedSeat" :key="seatId" class="p-4 bg-white rounded-3xl border border-slate-100 shadow-sm space-y-4">
+                    <div class="flex items-center justify-between">
+                        <span class="text-sm font-black text-slate-700 uppercase tracking-tight">Место №{{ seatId }}</span>
+                        <span v-if="seatGenders[seatId]" class="text-[9px] font-bold px-2 py-0.5 rounded-full" 
+                            :class="seatGenders[seatId] === 'male' ? 'bg-blue-100 text-blue-600' : 'bg-pink-100 text-pink-600'">
+                            {{ seatGenders[seatId] === 'male' ? 'Мужчина' : 'Женщина' }}
+                        </span>
+                    </div>
+                    
+                    <div class="grid grid-cols-2 gap-3">
+                        <button 
+                            @click="seatGenders[seatId] = 'male'"
+                            class="flex items-center justify-center space-x-2 p-3 rounded-2xl border-2 transition-all font-bold text-xs"
+                            :class="seatGenders[seatId] === 'male' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-gray-200'"
+                        >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            <span>М</span>
+                        </button>
+                        <button 
+                            @click="seatGenders[seatId] = 'female'"
+                            class="flex items-center justify-center space-x-2 p-3 rounded-2xl border-2 transition-all font-bold text-xs"
+                            :class="seatGenders[seatId] === 'female' ? 'border-pink-500 bg-pink-50 text-pink-700' : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-gray-200'"
+                        >
+                            <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
+                            <span>Ж</span>
+                        </button>
+                    </div>
                 </div>
             </div>
 
@@ -205,7 +221,7 @@ export default {
                         class="flex-[2] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all disabled:opacity-50 disabled:grayscale bg-slate-900 text-white shadow-slate-900/30 hover:shadow-2xl hover:-translate-y-0.5 active:scale-95 flex items-center justify-center space-x-2"
                     >
                         <span v-if="bookingLoading" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>
-                        <span v-else>{{ selectedSeat.length > 0 ? 'Забронировать' : 'Выберите место' }}</span>
+                        <span v-else>{{ selectedSeat.length > 0 ? (selectedSeat.length === 1 ? 'Забронировать' : `Забронировать ${selectedSeat.length} места`) : 'Выберите место' }}</span>
                     </button>
                 </div>
             </div>

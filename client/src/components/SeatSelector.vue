@@ -72,21 +72,16 @@ export default {
             // Driver seat (id 1) is always reserved
             if (seatId === 1) return;
             
-            // If mode is 'select' (booking), only allow single selection
-            if (this.mode === 'select') {
-                // Check if seat is already booked or reserved
-                if (this.isSeatBooked(seatId) || this.isSeatReserved(seatId)) {
-                    return;
-                }
-                this.selectedSeats = [seatId];
+            // Check if seat is already booked or reserved
+            if (this.isSeatBooked(seatId) || this.isSeatReserved(seatId)) {
+                return;
+            }
+
+            const index = this.selectedSeats.indexOf(seatId);
+            if (index > -1) {
+                this.selectedSeats = this.selectedSeats.filter(id => id !== seatId);
             } else {
-                // If mode is 'reserve' (creating ride), allow multiple selection
-                const index = this.selectedSeats.indexOf(seatId);
-                if (index > -1) {
-                    this.selectedSeats = this.selectedSeats.filter(id => id !== seatId);
-                } else {
-                    this.selectedSeats = [...this.selectedSeats, seatId];
-                }
+                this.selectedSeats = [...this.selectedSeats, seatId];
             }
         },
         isSeatSelected(seatId) {
