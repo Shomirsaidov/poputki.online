@@ -10,9 +10,10 @@ import {
   PointElement, 
   CategoryScale, 
   LinearScale,
-  ArcElement
+  ArcElement,
+  BarElement
 } from 'chart.js';
-import { Line, Pie } from 'vue-chartjs';
+import { Line, Pie, Bar } from 'vue-chartjs';
 
 ChartJS.register(
   Title, 
@@ -22,13 +23,15 @@ ChartJS.register(
   PointElement, 
   CategoryScale, 
   LinearScale,
-  ArcElement
+  ArcElement,
+  BarElement
 );
 
 export default {
     components: {
         LineChart: Line,
         PieChart: Pie,
+        BarChart: Bar,
         AppLogo
     },
     data() {
@@ -41,8 +44,10 @@ export default {
             rides: [],
             busTickets: [],
             reviews: [],
-            cities: [],
-            newCityName: '',
+            ridesCities: [],
+            busCities: [],
+            newRideCity: '',
+            newBusCity: '',
             loading: false,
             isCreatingBus: false,
             busForm: {
@@ -91,17 +96,17 @@ export default {
                 maintainAspectRatio: false,
                 plugins: {
                     legend: {
-                        labels: { color: '#94a3b8' }
+                        labels: { color: '#475569' }
                     }
                 },
                 scales: {
                     y: {
-                        grid: { color: '#334155' },
-                        ticks: { color: '#94a3b8' }
+                        grid: { color: '#f1f5f9' },
+                        ticks: { color: '#64748b' }
                     },
                     x: {
-                        grid: { color: '#334155' },
-                        ticks: { color: '#94a3b8' }
+                        grid: { color: '#f1f5f9' },
+                        ticks: { color: '#64748b' }
                     }
                 }
             },
@@ -111,7 +116,7 @@ export default {
                 plugins: {
                     legend: {
                         position: 'bottom',
-                        labels: { color: '#94a3b8' }
+                        labels: { color: '#475569' }
                     }
                 }
             }
@@ -152,13 +157,36 @@ export default {
                 ]
             };
         },
+        ageChartData() {
+            if (!this.stats || !this.stats.ageDistribution) return null;
+            return {
+                labels: this.stats.ageDistribution.map(a => a.label),
+                datasets: [{
+                    label: 'Пользователи',
+                    data: this.stats.ageDistribution.map(a => a.count),
+                    backgroundColor: '#3b82f6',
+                    borderRadius: 8
+                }]
+            };
+        },
+        carModelChartData() {
+            if (!this.stats || !this.stats.carModelDistribution) return null;
+            return {
+                labels: this.stats.carModelDistribution.map(c => c.model),
+                datasets: [{
+                    data: this.stats.carModelDistribution.map(c => c.count),
+                    backgroundColor: ['#f59e0b', '#3b82f6', '#10b981', '#6366f1', '#ec4899', '#f43f5e', '#8b5cf6', '#06b6d4', '#475569', '#1e293b'],
+                    borderWidth: 0
+                }]
+            };
+        },
         vehicleChartData() {
             if (!this.stats) return null;
             return {
-                labels: this.stats.vehicleDistribution.map(r => r.status === 'with_vehicle' ? 'С авто' : 'Без авто'),
+                labels: ['С авто', 'Без авто'],
                 datasets: [{
-                    data: this.stats.vehicleDistribution.map(r => r.count),
-                    backgroundColor: ['#f59e0b', '#3b82f6'],
+                    data: [this.stats.usersWithCars || 0, this.stats.usersWithoutCars || 0],
+                    backgroundColor: ['#10b981', '#f43f5e'],
                     borderWidth: 0
                 }]
             };
@@ -298,15 +326,20 @@ export default {
         async fetchCities() {
             this.loading = true;
             try {
-                const res = await api.get('/admin/cities');
-                this.cities = res.data;
+                const [ridesRes, busesRes] = await Promise.all([
+                    api.get('/admin/cities', { params: { type: 'ride' } }),
+                    api.get('/admin/cities', { params: { type: 'bus' } })
+                ]);
+                this.ridesCities = ridesRes.data;
+                this.busCities = busesRes.data;
             } catch (e) { console.error(e); } finally { this.loading = false; }
         },
-        async addCity() {
-            if (!this.newCityName) return;
+        async addCity(type) {
+            const name = type === 'ride' ? this.newRideCity : this.newBusCity;
+            if (!name) return;
             try {
-                await api.post('/admin/cities', { name: this.newCityName });
-                this.newCityName = '';
+                await api.post('/admin/cities', { name, type });
+                if (type === 'ride') this.newRideCity = ''; else this.newBusCity = '';
                 this.fetchCities();
             } catch (e) { 
                 alert(e.response?.data?.error || 'Ошибка при добавлении города'); 
@@ -395,57 +428,53 @@ export default {
 </script>
 
 <template>
-    <div class="admin-panel h-screen bg-slate-900 text-slate-100 flex overflow-hidden font-sans">
-        <!-- Mobile Header (Visible only on mobile) -->
-        <div class="lg:hidden fixed top-0 inset-x-0 z-40 bg-slate-800 border-b border-slate-700 p-4 flex justify-between items-center">
+    <div class="admin-panel h-screen bg-white text-slate-900 flex overflow-hidden font-sans">
+        <!-- Mobile Header -->
+        <div class="lg:hidden fixed top-0 inset-x-0 z-40 bg-white border-b border-slate-100 p-4 flex justify-between items-center shadow-sm">
             <div class="flex items-center space-x-3">
                 <AppLogo 
                     :showText="false" 
                     iconSizeClass="w-8 h-8"
                     iconClass="h-5 w-5"
-                    iconBgClass="bg-amber-500 text-slate-900"
+                    iconBgClass="bg-amber-500 text-white"
                 />
-                <span class="text-lg font-bold tracking-tight">Admin</span>
+                <span class="text-lg font-bold tracking-tight text-slate-900">Admin</span>
             </div>
-            <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-slate-300 p-2">
-                <svg v-if="!mobileMenuOpen" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" />
-                </svg>
-                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" />
-                </svg>
+            <button @click="mobileMenuOpen = !mobileMenuOpen" class="text-slate-500 p-2">
+                <svg v-if="!mobileMenuOpen" xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 12h16M4 18h16" /></svg>
+                <svg v-else xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12" /></svg>
             </button>
         </div>
         
         <!-- Auth Overlay -->
-        <div v-if="!isAuthenticated" class="fixed inset-0 z-[100] bg-slate-900 flex items-center justify-center p-4 sm:p-6">
-            <div class="max-w-md w-full bg-slate-800 p-6 sm:p-8 rounded-[32px] border border-slate-700 shadow-2xl text-center">
-                <div class="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mx-auto mb-6">
+        <div v-if="!isAuthenticated" class="fixed inset-0 z-[100] bg-slate-50 flex items-center justify-center p-4 sm:p-6">
+            <div class="max-w-md w-full bg-white p-8 rounded-[40px] border border-slate-100 shadow-xl text-center">
+                <div class="w-20 h-20 bg-amber-50 rounded-[28px] flex items-center justify-center mx-auto mb-8 border border-amber-100">
                     <svg xmlns="http://www.w3.org/2000/svg" class="h-10 w-10 text-amber-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
                     </svg>
                 </div>
-                <h1 class="text-3xl font-bold mb-2">Admin Panel</h1>
-                <p class="text-slate-400 mb-8">Введите код доступа для работы с системой</p>
+                <h1 class="text-3xl font-black mb-2 text-slate-900">Admin Panel</h1>
+                <p class="text-slate-400 mb-8 font-medium">Введите код доступа для работы с системой</p>
                 <input 
                     v-model="passcode" 
                     type="password" 
                     placeholder="••••••"
-                    class="w-full bg-slate-700 border-2 border-slate-600 rounded-2xl p-4 text-center text-2xl tracking-[1em] focus:border-amber-500 outline-none transition-all mb-6"
+                    class="w-full bg-slate-50 border border-slate-100 rounded-3xl p-5 text-center text-3xl tracking-[0.5em] focus:border-amber-500 outline-none transition-all mb-8 shadow-inner text-slate-900"
                     @keyup.enter="checkPasscode"
                 />
                 <button 
                     @click="checkPasscode"
-                    class="w-full bg-amber-500 hover:bg-amber-600 text-slate-900 font-bold py-4 rounded-2xl transition-all shadow-lg shadow-amber-500/20"
+                    class="w-full bg-amber-500 hover:bg-amber-600 text-white font-black py-5 rounded-[24px] transition-all shadow-lg shadow-amber-500/20 text-lg"
                 >
-                    Войти
+                    Войти в систему
                 </button>
             </div>
         </div>
 
         <!-- Sidebar -->
         <aside 
-            class="lg:w-72 bg-slate-800 border-r border-slate-700 flex flex-col pt-8 fixed lg:relative inset-y-0 left-0 z-30 transition-transform transform lg:translate-x-0 w-64"
+            class="lg:w-72 bg-slate-50 border-r border-slate-100 flex flex-col pt-10 fixed lg:relative inset-y-0 left-0 z-30 transition-transform transform lg:translate-x-0 w-64"
             :class="mobileMenuOpen ? 'translate-x-0' : '-translate-x-full'"
         >
             <div class="px-8 mb-12">
@@ -454,31 +483,31 @@ export default {
                         :showText="false" 
                         iconSizeClass="w-10 h-10"
                         iconClass="h-6 w-6"
-                        iconBgClass="bg-amber-500 text-slate-900"
+                        iconBgClass="bg-amber-500 text-white"
                     />
-                    <span class="text-xl font-bold tracking-tight">Poputki Admin</span>
+                    <span class="text-xl font-black tracking-tight text-slate-900">Poputki Admin</span>
                 </div>
             </div>
 
-            <nav class="flex-1 px-4 space-y-2 overflow-y-auto">
+            <nav class="flex-1 px-4 space-y-1.5 overflow-y-auto">
                 <button 
                     v-for="item in navItems" 
                     :key="item.id"
                     @click="activeTab = item.id; mobileMenuOpen = false"
-                    class="w-full px-4 py-3 rounded-xl flex items-center space-x-3 transition-all group"
-                    :class="activeTab === item.id ? 'bg-amber-500 text-slate-900' : 'text-slate-400 hover:bg-slate-700/50 hover:text-slate-100'"
+                    class="w-full px-5 py-4 rounded-2xl flex items-center space-x-3 transition-all group font-bold"
+                    :class="activeTab === item.id ? 'bg-amber-500 text-white shadow-lg shadow-amber-500/20' : 'text-slate-400 hover:bg-white hover:text-slate-900'"
                 >
                     <span class="capitalize">{{ item.label }}</span>
                 </button>
             </nav>
 
-            <div class="p-6 border-t border-slate-700">
-                <button @click="isAuthenticated = false" class="text-xs text-slate-500 hover:text-red-400 transition-colors">Выйти из сессии</button>
+            <div class="p-8 border-t border-slate-100">
+                <button @click="isAuthenticated = false" class="text-xs font-bold text-slate-300 hover:text-red-400 transition-colors uppercase tracking-widest">Выйти из сессии</button>
             </div>
         </aside>
 
         <!-- Main Content -->
-        <main class="flex-1 overflow-y-auto bg-slate-950 p-4 sm:p-6 lg:p-10 pt-20 lg:pt-10 w-full overflow-x-hidden">
+        <main class="flex-1 overflow-y-auto bg-white p-4 sm:p-6 lg:p-10 pt-20 lg:pt-10 w-full overflow-x-hidden">
             
             <!-- Dashboard Section -->
             <section v-if="activeTab === 'dashboard'" class="space-y-6 lg:space-y-10">
@@ -490,31 +519,49 @@ export default {
                 </div>
 
                 <div v-if="stats" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-2 gap-4 lg:gap-6">
-                    <div class="bg-slate-800 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <p class="text-slate-400 text-xs lg:text-sm font-medium uppercase tracking-wider mb-2">Пользователи</p>
-                        <h3 class="text-3xl lg:text-4xl font-black">{{ stats.totalUsers }}</h3>
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <p class="text-slate-400 text-xs lg:text-sm font-black uppercase tracking-widest mb-2">Пользователи</p>
+                        <h3 class="text-3xl lg:text-4xl font-black text-slate-900 font-mono">{{ stats.totalUsers }}</h3>
                     </div>
-                    <div class="bg-slate-800 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <p class="text-slate-400 text-xs lg:text-sm font-medium uppercase tracking-wider mb-2">Активные поездки</p>
-                        <h3 class="text-3xl lg:text-4xl font-black text-amber-500">{{ stats.activeRides }}</h3>
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm border-l-[6px] border-l-amber-500">
+                        <p class="text-slate-400 text-xs lg:text-sm font-black uppercase tracking-widest mb-2">Активные поездки</p>
+                        <h3 class="text-3xl lg:text-4xl font-black text-amber-500 font-mono">{{ stats.activeRides }}</h3>
                     </div>
                 </div>
 
-                <div v-if="stats" class="grid grid-cols-1 lg:grid-cols-3 gap-6 lg:gap-10">
+                <div v-if="stats" class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
                     <!-- Growth Chart -->
-                    <div class="lg:col-span-2 bg-slate-800/50 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <h4 class="text-lg lg:text-xl font-bold mb-6 flex justify-between items-center">
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <h4 class="text-lg lg:text-xl font-bold mb-6 flex justify-between items-center text-slate-800">
                             <span>Динамика роста</span>
-                            <span class="text-xs text-slate-500 font-normal">Последние 7 дней</span>
+                            <span class="text-xs text-slate-400 font-normal">Последние 7 дней</span>
                         </h4>
                         <div class="h-[300px]">
                             <LineChart :data="growthChartData" :options="chartOptions" />
                         </div>
                     </div>
 
+                    <!-- Car Models -->
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <h4 class="text-lg lg:text-xl font-bold mb-6 text-slate-800">Модели автомобилей</h4>
+                        <div class="h-[300px]">
+                            <PieChart :data="carModelChartData" :options="pieOptions" />
+                        </div>
+                    </div>
+                </div>
+
+                <div v-if="stats" class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
+                     <!-- Age Distribution -->
+                     <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <h4 class="text-lg lg:text-xl font-bold mb-6 text-slate-800">Возраст пользователей</h4>
+                        <div class="h-[300px]">
+                            <BarChart :data="ageChartData" :options="chartOptions" />
+                        </div>
+                    </div>
+
                     <!-- Vehicle Distribution -->
-                    <div class="bg-slate-800/50 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <h4 class="text-lg lg:text-xl font-bold mb-6">Наличие авто</h4>
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <h4 class="text-lg lg:text-xl font-bold mb-6 text-slate-800">Наличие авто</h4>
                         <div class="h-[300px]">
                             <PieChart :data="vehicleChartData" :options="pieOptions" />
                         </div>
@@ -522,21 +569,21 @@ export default {
                 </div>
 
                 <div v-if="stats" class="grid grid-cols-1 lg:grid-cols-2 gap-6 lg:gap-10">
-                    <div class="bg-slate-800/50 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <h4 class="text-lg lg:text-xl font-bold mb-4 lg:mb-6">Новые пользователи</h4>
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <h4 class="text-lg lg:text-xl font-bold mb-4 lg:mb-6 text-slate-800">Новые пользователи</h4>
                         <div class="space-y-4">
-                            <div v-for="u in stats.recentUsers" :key="u.id" class="flex justify-between items-center border-b border-slate-700 pb-3 last:border-0">
-                                <span class="font-medium text-sm lg:text-base">{{ u.name }}</span>
-                                <span class="text-xs text-slate-500">{{ new Date(u.created_at).toLocaleDateString() }}</span>
+                            <div v-for="u in stats.recentUsers" :key="u.id" class="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0">
+                                <span class="font-medium text-sm lg:text-base text-slate-700">{{ u.name }}</span>
+                                <span class="text-xs text-slate-400">{{ new Date(u.created_at).toLocaleDateString() }}</span>
                             </div>
                         </div>
                     </div>
-                    <div class="bg-slate-800/50 p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-700">
-                        <h4 class="text-lg lg:text-xl font-bold mb-4 lg:mb-6">Популярные города</h4>
+                    <div class="bg-white p-6 lg:p-8 rounded-2xl lg:rounded-[32px] border border-slate-100 shadow-sm">
+                        <h4 class="text-lg lg:text-xl font-bold mb-4 lg:mb-6 text-slate-800">Популярные города</h4>
                         <div class="space-y-4">
-                            <div v-for="d in stats.popularDestinations" :key="d.to_city" class="flex justify-between items-center border-b border-slate-700 pb-3 last:border-0">
-                                <span class="font-medium text-sm lg:text-base">{{ d.to_city }}</span>
-                                <span class="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-xs font-bold">{{ d.count }} поездок</span>
+                            <div v-for="d in stats.popularDestinations" :key="d.to_city" class="flex justify-between items-center border-b border-slate-50 pb-3 last:border-0">
+                                <span class="font-medium text-sm lg:text-base text-slate-700">{{ d.to_city }}</span>
+                                <span class="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-xs font-bold">{{ d.count }} поездок</span>
                             </div>
                         </div>
                     </div>
@@ -545,29 +592,29 @@ export default {
 
             <!-- Users Section -->
             <section v-if="activeTab === 'users'" class="space-y-6 lg:space-y-8">
-                <h2 class="text-2xl lg:text-3xl font-bold">Пользователи</h2>
-                <div class="bg-slate-800 rounded-2xl lg:rounded-[32px] border border-slate-700 overflow-x-auto shadow-2xl">
+                <h2 class="text-2xl lg:text-3xl text-slate-900 font-bold">Пользователи</h2>
+                <div class="bg-white rounded-2xl lg:rounded-[32px] border border-slate-100 overflow-x-auto shadow-sm">
                     <table class="w-full text-left min-w-[700px]">
-                        <thead class="bg-slate-900/50 border-b border-slate-700">
+                        <thead class="bg-slate-50 border-b border-slate-100">
                             <tr>
-                                <th class="px-6 py-4 text-slate-400 font-medium">ID</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Имя</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Телефон</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Рейтинг</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Действия</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">ID</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Имя</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Телефон</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Рейтинг</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Действия</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-700">
-                            <tr v-for="user in users" :key="user.id" class="hover:bg-slate-700/30 transition-colors">
-                                <td class="px-6 py-4 font-mono text-slate-500">#{{ user.id }}</td>
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="user in users" :key="user.id" class="hover:bg-slate-50 transition-colors text-slate-700">
+                                <td class="px-6 py-4 font-mono text-slate-400">#{{ user.id }}</td>
                                 <td class="px-6 py-4 font-bold">{{ user.name }} {{ user.surname }}</td>
                                 <td class="px-6 py-4 font-mono">{{ user.phone }}</td>
                                 <td class="px-6 py-4">
-                                    <span class="bg-amber-500/10 text-amber-500 px-3 py-1 rounded-full text-sm font-bold">★ {{ user.rating }}</span>
+                                    <span class="bg-amber-50 text-amber-600 px-3 py-1 rounded-full text-sm font-bold">★ {{ user.rating }}</span>
                                 </td>
                                  <td class="px-6 py-4 text-right space-x-3">
-                                     <button @click="openEditUserModal(user)" class="text-amber-400 hover:text-amber-500 font-bold text-sm">Изменить</button>
-                                     <button @click="deleteUser(user.id)" class="text-red-400 hover:text-red-500 font-bold text-sm">Удалить</button>
+                                     <button @click="openEditUserModal(user)" class="text-amber-600 hover:text-amber-700 font-bold text-sm">Изменить</button>
+                                     <button @click="deleteUser(user.id)" class="text-red-500 hover:text-red-600 font-bold text-sm">Удалить</button>
                                  </td>
                             </tr>
                         </tbody>
@@ -577,41 +624,41 @@ export default {
 
             <!-- Bus Drivers Section -->
             <section v-if="activeTab === 'bus-drivers'" class="space-y-6 lg:space-y-8">
-                <h2 class="text-2xl lg:text-3xl font-bold">Водители автобусов</h2>
+                <h2 class="text-2xl lg:text-3xl text-slate-900 font-bold">Водители автобусов</h2>
                 
-                <div class="bg-slate-800 rounded-2xl lg:rounded-[32px] border border-slate-700 p-6 lg:p-8 shadow-2xl space-y-6">
-                    <h3 class="text-xl font-bold text-amber-500">Добавить водителя</h3>
+                <div class="bg-white rounded-2xl lg:rounded-[32px] border border-slate-100 p-6 lg:p-8 shadow-sm space-y-6">
+                    <h3 class="text-xl font-bold text-amber-600">Добавить водителя</h3>
                     <div class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-                        <input v-model="newBusDriver.name" placeholder="Имя" class="bg-slate-700 border border-slate-600 rounded-xl p-3 text-slate-100 outline-none focus:border-amber-500" />
-                        <input v-model="newBusDriver.surname" placeholder="Фамилия" class="bg-slate-700 border border-slate-600 rounded-xl p-3 text-slate-100 outline-none focus:border-amber-500" />
-                        <input v-model="newBusDriver.phone" placeholder="Телефон" type="tel" class="bg-slate-700 border border-slate-600 rounded-xl p-3 text-slate-100 outline-none focus:border-amber-500" />
-                        <input v-model="newBusDriver.password" placeholder="Пароль" type="text" class="bg-slate-700 border border-slate-600 rounded-xl p-3 text-slate-100 outline-none focus:border-amber-500" />
+                        <input v-model="newBusDriver.name" placeholder="Имя" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:border-amber-500" />
+                        <input v-model="newBusDriver.surname" placeholder="Фамилия" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:border-amber-500" />
+                        <input v-model="newBusDriver.phone" placeholder="Телефон" type="tel" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:border-amber-500" />
+                        <input v-model="newBusDriver.password" placeholder="Пароль" type="text" class="bg-slate-50 border border-slate-200 rounded-xl p-3 text-slate-900 outline-none focus:border-amber-500" />
                     </div>
                     <div class="flex justify-end">
-                        <button @click="createBusDriver" :disabled="loading" class="bg-amber-500 text-slate-900 font-bold px-6 py-3 rounded-xl shadow-lg hover:-translate-y-1 transition-all disabled:opacity-50">Создать водителя</button>
+                        <button @click="createBusDriver" :disabled="loading" class="bg-amber-500 text-white font-bold px-6 py-3 rounded-xl shadow-lg hover:-translate-y-1 transition-all disabled:opacity-50">Создать водителя</button>
                     </div>
                 </div>
 
-                <div class="bg-slate-800 rounded-2xl lg:rounded-[32px] border border-slate-700 overflow-x-auto shadow-2xl mt-8">
+                <div class="bg-white rounded-2xl lg:rounded-[32px] border border-slate-100 overflow-x-auto shadow-sm mt-8">
                     <table class="w-full text-left min-w-[700px]">
-                        <thead class="bg-slate-900/50 border-b border-slate-700">
+                        <thead class="bg-slate-50 border-b border-slate-100">
                             <tr>
-                                <th class="px-6 py-4 text-slate-400 font-medium">ID</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Имя</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Телефон</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Дата создания</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Действия</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">ID</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Имя</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Телефон</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Дата создания</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Действия</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-700">
-                            <tr v-for="driver in busDrivers" :key="driver.id" class="hover:bg-slate-700/30 transition-colors">
-                                <td class="px-6 py-4 font-mono text-slate-500">#{{ driver.id }}</td>
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="driver in busDrivers" :key="driver.id" class="hover:bg-slate-50 transition-colors text-slate-700">
+                                <td class="px-6 py-4 font-mono text-slate-400">#{{ driver.id }}</td>
                                 <td class="px-6 py-4 font-bold">{{ driver.name }} {{ driver.surname }}</td>
                                 <td class="px-6 py-4 font-mono">{{ driver.phone }}</td>
-                                <td class="px-6 py-4 text-slate-400 text-sm">{{ new Date(driver.created_at).toLocaleDateString() }}</td>
+                                <td class="px-6 py-4 text-slate-500 text-sm">{{ new Date(driver.created_at).toLocaleDateString() }}</td>
                                 <td class="px-6 py-4 space-x-3">
-                                     <button @click="openEditUserModal(driver)" class="text-amber-400 hover:text-amber-500 font-bold text-sm">Изменить</button>
-                                     <button @click="deleteUser(driver.id)" class="text-red-400 hover:text-red-500 font-bold text-sm">Удалить</button>
+                                     <button @click="openEditUserModal(driver)" class="text-amber-600 hover:text-amber-700 font-bold text-sm">Изменить</button>
+                                     <button @click="deleteUser(driver.id)" class="text-red-500 hover:text-red-600 font-bold text-sm">Удалить</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -621,37 +668,37 @@ export default {
 
              <!-- Rides Section -->
              <section v-if="activeTab === 'rides'" class="space-y-6 lg:space-y-8">
-                <h2 class="text-2xl lg:text-3xl font-bold">Все поездки</h2>
-                <div class="bg-slate-800 rounded-2xl lg:rounded-[32px] border border-slate-700 overflow-x-auto shadow-2xl">
+                <h2 class="text-2xl lg:text-3xl text-slate-900 font-bold">Все поездки</h2>
+                <div class="bg-white rounded-2xl lg:rounded-[32px] border border-slate-100 overflow-x-auto shadow-sm">
                     <table class="w-full text-left min-w-[800px]">
-                        <thead class="bg-slate-900/50 border-b border-slate-700">
+                        <thead class="bg-slate-50 border-b border-slate-100">
                             <tr>
-                                <th class="px-6 py-4 text-slate-400 font-medium">ID</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Маршрут</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Водитель</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Дата/Время</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Статус</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium text-right">Управление</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">ID</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Маршрут</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Водитель</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Дата/Время</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Статус</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold text-right">Управление</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-700">
-                            <tr v-for="ride in rides" :key="ride.id" class="hover:bg-slate-700/30 transition-colors">
-                                <td class="px-6 py-4 font-mono text-slate-500">#{{ ride.id }}</td>
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="ride in rides" :key="ride.id" class="hover:bg-slate-50 transition-colors text-slate-700">
+                                <td class="px-6 py-4 font-mono text-slate-400">#{{ ride.id }}</td>
                                 <td class="px-6 py-4">
                                     <div class="flex items-center space-x-2">
-                                        <span class="font-bold">{{ ride.from_city }}</span>
-                                        <span class="text-slate-500">→</span>
-                                        <span class="font-bold">{{ ride.to_city }}</span>
+                                        <span class="font-bold text-slate-800">{{ ride.from_city }}</span>
+                                        <span class="text-slate-400">→</span>
+                                        <span class="font-bold text-slate-800">{{ ride.to_city }}</span>
                                     </div>
                                 </td>
-                                <td class="px-6 py-4">{{ ride.driver_name }}</td>
-                                <td class="px-6 py-4 font-mono text-sm">{{ ride.date }} {{ ride.time }}</td>
+                                <td class="px-6 py-4 font-medium">{{ ride.driver_name }}</td>
+                                <td class="px-6 py-4 font-mono text-sm text-slate-500">{{ ride.date }} {{ ride.time }}</td>
                                 <td class="px-6 py-4">
-                                    <span :class="ride.status === 'active' ? 'bg-emerald-500/10 text-emerald-500' : 'bg-slate-500/10 text-slate-500'" class="px-3 py-1 rounded-full text-xs font-bold uppercase">{{ ride.status || 'active' }}</span>
+                                    <span :class="ride.status === 'active' ? 'bg-emerald-50 text-emerald-600' : 'bg-slate-50 text-slate-500'" class="px-3 py-1 rounded-full text-xs font-bold uppercase">{{ ride.status || 'active' }}</span>
                                 </td>
                                 <td class="px-6 py-4 text-right space-x-3">
-                                    <button @click="openEditRideModal(ride)" class="text-amber-400 hover:text-amber-500 font-bold text-sm">Изменить</button>
-                                    <button @click="deleteRide(ride.id)" class="text-red-400 hover:text-red-500 font-bold text-sm">Удалить</button>
+                                    <button @click="openEditRideModal(ride)" class="text-amber-600 hover:text-amber-700 font-bold text-sm">Изменить</button>
+                                    <button @click="deleteRide(ride.id)" class="text-red-500 hover:text-red-600 font-bold text-sm">Удалить</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -660,24 +707,70 @@ export default {
             </section>
 
             <!-- Cities Section -->
-            <section v-if="activeTab === 'cities'" class="space-y-6 lg:space-y-8">
-                <div class="flex flex-col sm:flex-row justify-between items-start sm:items-center space-y-4 sm:space-y-0">
-                    <h2 class="text-2xl lg:text-3xl font-bold">Города и направления</h2>
-                    <div class="flex space-x-2 sm:space-x-4 w-full sm:w-auto">
-                        <input v-model="newCityName" type="text" placeholder="Название города" class="bg-slate-800 border border-slate-700 rounded-xl px-4 py-2 outline-none focus:border-amber-500 w-full sm:w-auto">
-                        <button @click="addCity" class="bg-emerald-500 text-slate-900 px-4 sm:px-6 py-2 rounded-xl font-bold shadow-lg shadow-emerald-500/20 whitespace-nowrap">Добавить</button>
-                    </div>
+            <section v-if="activeTab === 'cities'" class="space-y-6 lg:space-y-10">
+                <div class="mb-8">
+                    <h2 class="text-3xl font-bold text-slate-900">Управление городами</h2>
+                    <p class="text-slate-500 mt-2">Раздельное управление списками для попуток и автобусов</p>
                 </div>
 
-                <div class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 lg:gap-6">
-                    <div v-for="city in cities" :key="city.id" class="bg-slate-800 p-4 lg:p-6 rounded-xl lg:rounded-2xl border border-slate-700 flex justify-between items-center group transition-all hover:border-amber-500/50 shadow-lg">
-                        <span class="font-bold text-lg">{{ city.name }}</span>
-                        <button @click="deleteCity(city.id)" class="text-red-500 opacity-0 group-hover:opacity-100 transition-all p-2 hover:bg-red-500/10 rounded-lg">
-                            <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
-                            </svg>
-                        </button>
+                <div class="grid grid-cols-1 xl:grid-cols-2 gap-8 lg:gap-12">
+                    
+                    <!-- Rides Cities -->
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-amber-50 rounded-xl flex items-center justify-center text-amber-600 border border-amber-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 17h2c.6 0 1-.4 1-1v-3c0-.9-.7-1.7-1.5-1.9C18.7 10.6 16 10 16 10s-1.3-1.4-2.2-2.3c-.5-.4-1.1-.7-1.8-.7H5c-.6 0-1.1.4-1.4.9l-1.4 2.9A3.7 3.7 0 0 0 2 12v4c0 .6.4 1 1 1h2" /><circle cx="7" cy="17" r="2" /><path stroke-linecap="round" stroke-linejoin="round" d="M9 17h6" /><circle cx="17" cy="17" r="2" /></svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-xl text-slate-800 uppercase tracking-tight">Попутки</h3>
+                                    <p class="text-xs text-slate-400">Для частных поездок</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <input v-model="newRideCity" type="text" placeholder="Новый город" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-amber-500 w-32 md:w-auto text-slate-700">
+                                <button @click="addCity('ride')" class="bg-amber-500 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-amber-600 transition-colors">+</button>
+                            </div>
+                        </div>
+                        
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div v-for="city in ridesCities" :key="'ride-city-'+city.id" class="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center group hover:border-amber-500/30 transition-all shadow-sm">
+                                <span class="font-medium text-slate-700">{{ city.name }}</span>
+                                <button @click="deleteCity(city.id)" class="text-slate-300 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                </button>
+                            </div>
+                        </div>
                     </div>
+
+                    <!-- Bus Cities -->
+                    <div class="space-y-6">
+                        <div class="flex items-center justify-between bg-white p-6 rounded-[28px] border border-slate-100 shadow-sm">
+                            <div class="flex items-center space-x-4">
+                                <div class="w-10 h-10 bg-blue-50 rounded-xl flex items-center justify-center text-blue-600 border border-blue-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor"><rect x="3" y="5" width="18" height="14" rx="2"/><path stroke-linecap="round" stroke-linejoin="round" d="M3 11h18M7 19v2M17 19v2M3 8h18"/><circle cx="7.5" cy="16" r="1" fill="currentColor"/><circle cx="16.5" cy="16" r="1" fill="currentColor"/></svg>
+                                </div>
+                                <div>
+                                    <h3 class="font-bold text-xl text-slate-800 uppercase tracking-tight">Автобусы</h3>
+                                    <p class="text-xs text-slate-400">Для официальных рейсов</p>
+                                </div>
+                            </div>
+                            <div class="flex gap-2">
+                                <input v-model="newBusCity" type="text" placeholder="Новый город" class="bg-slate-50 border border-slate-200 rounded-xl px-4 py-2 text-sm outline-none focus:border-blue-500 w-32 md:w-auto text-slate-700">
+                                <button @click="addCity('bus')" class="bg-blue-500 text-white px-4 py-2 rounded-xl font-bold text-sm shadow-md hover:bg-blue-600 transition-colors">+</button>
+                            </div>
+                        </div>
+
+                        <div class="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                            <div v-for="city in busCities" :key="'bus-city-'+city.id" class="bg-white p-4 rounded-2xl border border-slate-100 flex justify-between items-center group hover:border-blue-400/30 transition-all shadow-sm">
+                                <span class="font-medium text-slate-700">{{ city.name }}</span>
+                                <button @click="deleteCity(city.id)" class="text-slate-300 hover:text-red-400 p-1.5 rounded-lg hover:bg-red-50 transition-all opacity-0 group-hover:opacity-100">
+                                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" viewBox="0 0 20 20" fill="currentColor"><path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" /></svg>
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
                 </div>
             </section>
 
@@ -717,7 +810,7 @@ export default {
                             <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Откуда</label>
                             <select v-model="busForm.from_city" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none focus:border-amber-500 transition-all shadow-inner appearance-none cursor-pointer" :class="{'border-red-500': busErrors.from_city}">
                                 <option value="" disabled>Выберите город</option>
-                                <option v-for="c in cities" :key="'bus-from-'+c.id" :value="c.name">{{ c.name }}</option>
+                                <option v-for="c in busCities" :key="'bus-from-'+c.id" :value="c.name">{{ c.name }}</option>
                             </select>
                             <p v-if="busErrors.from_city" class="text-[9px] text-red-500 ml-1">{{ busErrors.from_city }}</p>
                         </div>
@@ -734,7 +827,7 @@ export default {
                             <label class="text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">Куда</label>
                             <select v-model="busForm.to_city" class="w-full bg-slate-700/50 border border-slate-600 rounded-2xl p-4 text-slate-100 outline-none focus:border-amber-500 transition-all shadow-inner appearance-none cursor-pointer" :class="{'border-red-500': busErrors.to_city}">
                                 <option value="" disabled>Выберите город</option>
-                                <option v-for="c in cities" :key="'bus-to-'+c.id" :value="c.name">{{ c.name }}</option>
+                                <option v-for="c in busCities" :key="'bus-to-'+c.id" :value="c.name">{{ c.name }}</option>
                             </select>
                             <p v-if="busErrors.to_city" class="text-[9px] text-red-500 ml-1">{{ busErrors.to_city }}</p>
                         </div>
@@ -864,34 +957,34 @@ export default {
                     </div>
                 </div>
 
-                <div class="bg-slate-800 rounded-2xl lg:rounded-[32px] border border-slate-700 overflow-x-auto shadow-2xl">
+                <div class="bg-white rounded-2xl lg:rounded-[32px] border border-slate-100 overflow-x-auto shadow-sm">
                     <table class="w-full text-left min-w-[900px]">
-                        <thead class="bg-slate-900/50 border-b border-slate-700">
+                        <thead class="bg-slate-50 border-b border-slate-100">
                             <tr>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Маршрут</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Компания</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Дата/Время</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Свободно</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Цена</th>
-                                <th class="px-6 py-4 text-slate-400 font-medium">Действия</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Маршрут</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Компания</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Дата/Время</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Свободно</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold">Цена</th>
+                                <th class="px-6 py-4 text-slate-500 font-semibold text-right">Действия</th>
                             </tr>
                         </thead>
-                        <tbody class="divide-y divide-slate-700">
-                            <tr v-for="ticket in busTickets" :key="ticket.id" class="hover:bg-slate-700/30 transition-colors">
+                        <tbody class="divide-y divide-slate-50">
+                            <tr v-for="ticket in busTickets" :key="ticket.id" class="hover:bg-slate-50 transition-colors text-slate-700">
                                 <td class="px-6 py-4">
                                     <div class="flex flex-col">
-                                        <span class="font-bold">{{ ticket.from_city }} → {{ ticket.to_city }}</span>
-                                        <span class="text-xs text-slate-500">{{ ticket.from_address }}</span>
+                                        <span class="font-bold text-slate-800">{{ ticket.from_city }} → {{ ticket.to_city }}</span>
+                                        <span class="text-xs text-slate-400">{{ ticket.from_address }}</span>
                                     </div>
                                 </td>
                                 <td class="px-6 py-4 text-sm">{{ ticket.transport_company }}</td>
-                                <td class="px-6 py-4 font-mono text-sm">{{ ticket.departure_date }} {{ ticket.departure_time }}</td>
+                                <td class="px-6 py-4 font-mono text-sm text-slate-500">{{ ticket.departure_date }} {{ ticket.departure_time }}</td>
                                 <td class="px-6 py-4">
-                                     <span class="text-amber-500 font-bold">{{ ticket.total_seats }}</span>
+                                     <span class="text-amber-600 font-bold">{{ ticket.total_seats }}</span>
                                 </td>
-                                <td class="px-6 py-4 font-bold text-emerald-400">{{ ticket.price }} с.</td>
-                                <td class="px-6 py-4">
-                                    <button @click="deleteBusTicket(ticket.id)" class="text-red-400 hover:text-red-500 transition-colors text-sm font-bold">Удалить</button>
+                                <td class="px-6 py-4 font-bold text-emerald-600">{{ ticket.price }} с.</td>
+                                <td class="px-6 py-4 text-right">
+                                    <button @click="deleteBusTicket(ticket.id)" class="text-red-500 hover:text-red-600 transition-colors text-sm font-bold">Удалить</button>
                                 </td>
                             </tr>
                         </tbody>
@@ -901,63 +994,63 @@ export default {
 
              <!-- Reviews Section -->
              <section v-if="activeTab === 'reviews'" class="space-y-6 lg:space-y-8">
-                <h2 class="text-2xl lg:text-3xl font-bold">Управление отзывами</h2>
+                <h2 class="text-2xl lg:text-3xl text-slate-900 font-bold">Управление отзывами</h2>
                 <div class="grid grid-cols-1 md:grid-cols-2 gap-4 lg:gap-6">
-                    <div v-for="review in reviews" :key="review.id" class="bg-slate-800 p-5 lg:p-6 rounded-2xl lg:rounded-[32px] border border-slate-700 relative group">
-                        <button @click="deleteReview(review.id)" class="absolute top-4 right-4 lg:top-6 lg:right-6 p-2 rounded-xl bg-red-500/10 text-red-500 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white">
+                    <div v-for="review in reviews" :key="review.id" class="bg-white p-5 lg:p-6 rounded-2xl lg:rounded-[32px] border border-slate-100 relative group shadow-sm">
+                        <button @click="deleteReview(review.id)" class="absolute top-4 right-4 lg:top-6 lg:right-6 p-2 rounded-xl bg-red-50 text-red-500 opacity-100 lg:opacity-0 group-hover:opacity-100 transition-all hover:bg-red-500 hover:text-white">
                             <svg xmlns="http://www.w3.org/2000/svg" class="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fill-rule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clip-rule="evenodd" />
                             </svg>
                         </button>
                         <div class="flex items-center space-x-4 mb-4">
-                            <div class="w-12 h-12 bg-slate-700 rounded-2xl flex items-center justify-center font-bold text-xl text-amber-500">
+                            <div class="w-12 h-12 bg-slate-100 rounded-2xl flex items-center justify-center font-bold text-xl text-amber-500 border border-slate-200">
                                 {{ review.reviewer_name?.[0] }}
                             </div>
                             <div>
-                                <h4 class="font-bold">{{ review.reviewer_name }}</h4>
-                                <p class="text-sm text-slate-500">Для водителя <span class="text-slate-300">{{ review.driver_name }}</span></p>
+                                <h4 class="font-bold text-slate-800">{{ review.reviewer_name }}</h4>
+                                <p class="text-sm text-slate-500">Для водителя <span class="text-slate-700 font-medium">{{ review.driver_name }}</span></p>
                             </div>
                         </div>
                         <div class="flex items-center space-x-1 text-amber-500 mb-3">
                             <span v-for="i in 5" :key="i" :class="i <= review.rating ? 'opacity-100' : 'opacity-20'">★</span>
                         </div>
-                        <p class="text-slate-300 italic">"{{ review.comment }}"</p>
+                        <p class="text-slate-600 italic">"{{ review.comment }}"</p>
                     </div>
                 </div>
             </section>
 
             <!-- User Edit Modal -->
-            <div v-if="showUserEditModal" class="fixed inset-0 z-[110] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div class="max-w-md w-full bg-slate-800 p-8 rounded-[32px] border border-slate-700 shadow-2xl">
-                    <h3 class="text-2xl font-bold mb-6">Редактировать пользователя</h3>
+            <div v-if="showUserEditModal" class="fixed inset-0 z-[110] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="max-w-md w-full bg-white p-8 rounded-[32px] border border-slate-100 shadow-2xl">
+                    <h3 class="text-2xl font-bold mb-6 text-slate-900">Редактировать пользователя</h3>
                     <div class="space-y-4">
-                        <input v-model="editingUser.name" placeholder="Имя" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
-                        <input v-model="editingUser.surname" placeholder="Фамилия" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
-                        <input v-model="editingUser.phone" placeholder="Телефон" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
+                        <input v-model="editingUser.name" placeholder="Имя" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
+                        <input v-model="editingUser.surname" placeholder="Фамилия" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
+                        <input v-model="editingUser.phone" placeholder="Телефон" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
                     </div>
                     <div class="flex space-x-4 mt-8">
                         <button @click="showUserEditModal = false" class="flex-1 py-4 text-slate-400 font-bold">Отмена</button>
-                        <button @click="updateUser" class="flex-1 bg-amber-500 text-slate-900 py-4 rounded-xl font-bold shadow-lg">Сохранить</button>
+                        <button @click="updateUser" class="flex-1 bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-amber-500/20">Сохранить</button>
                     </div>
                 </div>
             </div>
 
             <!-- Ride Edit Modal -->
-            <div v-if="showRideEditModal" class="fixed inset-0 z-[110] bg-slate-900/80 backdrop-blur-sm flex items-center justify-center p-4">
-                <div class="max-w-md w-full bg-slate-800 p-8 rounded-[32px] border border-slate-700 shadow-2xl">
-                    <h3 class="text-2xl font-bold mb-6">Редактировать поездку</h3>
+            <div v-if="showRideEditModal" class="fixed inset-0 z-[110] bg-slate-900/40 backdrop-blur-sm flex items-center justify-center p-4">
+                <div class="max-w-md w-full bg-white p-8 rounded-[32px] border border-slate-100 shadow-2xl">
+                    <h3 class="text-2xl font-bold mb-6 text-slate-900">Редактировать поездку</h3>
                     <div class="space-y-4">
                         <div class="grid grid-cols-2 gap-4">
-                            <input v-model="editingRide.from_city" placeholder="Откуда" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
-                            <input v-model="editingRide.to_city" placeholder="Куда" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
+                            <input v-model="editingRide.from_city" placeholder="Откуда" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
+                            <input v-model="editingRide.to_city" placeholder="Куда" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
                         </div>
-                        <input v-model="editingRide.date" type="date" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
-                        <input v-model="editingRide.time" type="time" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
-                        <input v-model="editingRide.price" type="number" placeholder="Цена" class="w-full bg-slate-700 border border-slate-600 rounded-xl p-4 outline-none focus:border-amber-500" />
+                        <input v-model="editingRide.date" type="date" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
+                        <input v-model="editingRide.time" type="time" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
+                        <input v-model="editingRide.price" type="number" placeholder="Цена" class="w-full bg-slate-50 border border-slate-200 rounded-xl p-4 outline-none focus:border-amber-500 text-slate-900" />
                     </div>
                     <div class="flex space-x-4 mt-8">
                         <button @click="showRideEditModal = false" class="flex-1 py-4 text-slate-400 font-bold">Отмена</button>
-                        <button @click="updateRide" class="flex-1 bg-amber-500 text-slate-900 py-4 rounded-xl font-bold shadow-lg">Сохранить</button>
+                        <button @click="updateRide" class="flex-1 bg-amber-500 text-white py-4 rounded-xl font-bold shadow-lg shadow-amber-500/20">Сохранить</button>
                     </div>
                 </div>
             </div>
@@ -968,7 +1061,7 @@ export default {
 
 <style scoped>
 .admin-panel {
-    background-color: #0f172a;
+    background-color: #f8fafc;
 }
 /* Hide scrollbar for Chrome, Safari and Opera */
 main::-webkit-scrollbar {

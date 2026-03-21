@@ -96,6 +96,33 @@ router.get('/stats', async (req, res) => {
             { status: 'no_vehicle', count: noVehicle }
         ];
 
+        // Age Distribution
+        const { data: userAges } = await supabase.from('users').select('age');
+        const ageBins = { '18-25': 0, '26-35': 0, '36-45': 0, '46-60': 0, '60+': 0, 'Unknown': 0 };
+        (userAges || []).forEach(u => {
+            if (!u.age) ageBins['Unknown']++;
+            else if (u.age <= 25) ageBins['18-25']++;
+            else if (u.age <= 35) ageBins['26-35']++;
+            else if (u.age <= 45) ageBins['36-45']++;
+            else if (u.age <= 60) ageBins['46-60']++;
+            else ageBins['60+']++;
+        });
+        const ageDistribution = Object.keys(ageBins).map(label => ({ label, count: ageBins[label] }));
+
+        // Car Model Distribution
+        const { data: carModels } = await supabase.from('vehicles').select('model');
+        const modelCounts = (carModels || []).reduce((acc, curr) => {
+            if (curr.model) {
+                const model = curr.model.trim();
+                acc[model] = (acc[model] || 0) + 1;
+            }
+            return acc;
+        }, {});
+        const carModelDistribution = Object.keys(modelCounts)
+            .map(model => ({ model, count: modelCounts[model] }))
+            .sort((a, b) => b.count - a.count)
+            .slice(0, 10);
+
         const stats = {
             totalUsers,
             totalRides,
@@ -107,7 +134,9 @@ router.get('/stats', async (req, res) => {
             popularDestinations,
             ridesLast7Days,
             usersLast7Days,
-            vehicleDistribution
+            vehicleDistribution,
+            ageDistribution,
+            carModelDistribution
         };
 
         res.json(stats);
@@ -242,11 +271,18 @@ router.put('/rides/:id', async (req, res) => {
 
 // City Management
 router.get('/cities', async (req, res) => {
+    const { type } = req.query;
     try {
-        const { data: cities, error } = await supabase
+        let query = supabase
             .from('cities')
             .select('*')
             .order('name', { ascending: true });
+        
+        if (type) {
+            query = query.eq('type', type);
+        }
+
+        const { data: cities, error } = await query;
         if (error) throw error;
         console.log(`[Admin] Fetched ${cities?.length} cities`);
         res.json(cities);
@@ -256,9 +292,9 @@ router.get('/cities', async (req, res) => {
 });
 
 router.post('/cities', async (req, res) => {
-    const { name } = req.body;
+    const { name, type } = req.body;
     try {
-        const { error } = await supabase.from('cities').insert([{ name }]);
+        const { error } = await supabase.from('cities').insert([{ name, type: type || 'ride' }]);
         if (error) throw error;
         res.json({ success: true });
     } catch (err) {

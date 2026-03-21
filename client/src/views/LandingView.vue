@@ -22,7 +22,8 @@ export default {
   methods: {
     async fetchCities() {
       try {
-        const res = await api.get('/general/cities');
+        const type = this.activeTab === 'buses' ? 'bus' : 'ride';
+        const res = await api.get('/general/cities', { params: { type } });
         this.availableCities = res.data;
       } catch (err) {
         console.error('Failed to fetch cities:', err);
@@ -81,6 +82,14 @@ export default {
     this.fetchCities();
     this.fetchRecentRides();
     this.syncTelegram();
+  },
+  watch: {
+    activeTab() {
+      this.fetchCities();
+      // Reset selected cities if needed, or keep them if they exist in both lists
+      // this.fromCity = '';
+      // this.toCity = '';
+    }
   }
 };
 </script>

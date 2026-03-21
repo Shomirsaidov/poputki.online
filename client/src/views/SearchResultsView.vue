@@ -65,6 +65,7 @@ export default {
       this.fromCity = '';
       this.toCity = '';
       this.date = '';
+      this.fetchCities(); // Fetch relevant cities for the new tab
       await this.search();
     },
     formatDuration(minutes) {
@@ -94,7 +95,8 @@ export default {
     },
     async fetchCities() {
       try {
-        const res = await api.get('/general/cities');
+        const type = this.activeTab === 'buses' ? 'bus' : 'ride';
+        const res = await api.get('/general/cities', { params: { type } });
         this.availableCities = res.data;
       } catch (err) {
         console.error('Failed to fetch cities:', err);
@@ -437,6 +439,26 @@ export default {
                 </div>
               </div>
 
+              <!-- Intermediate stop indicator if matched -->
+              <div v-if="ticket.matchingStop" class="mt-4 px-4 py-3 bg-blue-50 border border-blue-100 rounded-2xl flex items-center justify-between animate-fade-in shadow-sm">
+                <div class="flex items-center gap-3">
+                  <div class="w-8 h-8 rounded-full bg-blue-600 flex items-center justify-center text-white shadow-lg shadow-blue-500/20">
+                    <svg xmlns="http://www.w3.org/2000/svg" class="h-4 w-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M17.657 16.657L13.414 20.9a1.998 1.998 0 01-2.827 0l-4.244-4.243a8 8 0 1111.314 0z" />
+                      <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2.5" d="M15 11a3 3 0 11-6 0 3 3 0 016 0z" />
+                    </svg>
+                  </div>
+                  <div>
+                    <div class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] leading-none mb-1">Ваша остановка</div>
+                    <div class="text-sm font-bold text-blue-700">{{ ticket.matchingStop.city }}</div>
+                  </div>
+                </div>
+                <div class="text-right">
+                  <div class="text-[10px] font-black text-blue-400 uppercase tracking-[0.2em] leading-none mb-1">Время</div>
+                  <div class="text-sm font-black text-blue-800">{{ ticket.matchingStop.time }}</div>
+                </div>
+              </div>
+
               <!-- Divider -->
               <div class="border-t border-dashed border-gray-100 my-4"></div>
 
@@ -534,5 +556,12 @@ export default {
 .fade-slide-enter-from, .fade-slide-leave-to {
   opacity: 0;
   transform: translateY(-12px) scale(0.98);
+}
+.animate-fade-in {
+  animation: fadeIn 0.4s ease-out;
+}
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
 }
 </style>

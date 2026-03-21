@@ -128,6 +128,10 @@ export default {
                 total += this.ride.row_prices[row] || this.ride.price;
             }
             return total;
+        },
+        allGendersSelected() {
+            if (this.selectedSeat.length === 0) return false;
+            return this.selectedSeat.every(seatId => this.seatGenders[seatId]);
         }
     },
     mounted() {
@@ -192,7 +196,7 @@ export default {
                             :class="seatGenders[seatId] === 'male' ? 'border-blue-500 bg-blue-50 text-blue-700' : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-gray-200'"
                         >
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                            <span>М</span>
+                            <span>Мужчина</span>
                         </button>
                         <button 
                             @click="seatGenders[seatId] = 'female'"
@@ -200,7 +204,7 @@ export default {
                             :class="seatGenders[seatId] === 'female' ? 'border-pink-500 bg-pink-50 text-pink-700' : 'border-slate-50 bg-slate-50 text-slate-400 hover:border-gray-200'"
                         >
                             <svg class="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" /></svg>
-                            <span>Ж</span>
+                            <span>Женщина</span>
                         </button>
                     </div>
                 </div>
@@ -217,7 +221,7 @@ export default {
                     </div>
                     <button 
                         @click="bookSeat" 
-                        :disabled="selectedSeat.length === 0 || !bookingGender || bookingLoading"
+                        :disabled="!allGendersSelected || bookingLoading"
                         class="flex-[2] py-4 rounded-2xl font-bold text-lg shadow-xl transition-all disabled:opacity-50 disabled:grayscale bg-slate-900 text-white shadow-slate-900/30 hover:shadow-2xl hover:-translate-y-0.5 active:scale-95 flex items-center justify-center space-x-2"
                     >
                         <span v-if="bookingLoading" class="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin"></span>

@@ -296,7 +296,7 @@ export default {
         },
         async fetchCities() {
             try {
-                const res = await api.get('/general/cities');
+                const res = await api.get('/general/cities', { params: { type: 'ride' } });
                 this.availableCities = res.data;
             } catch (err) {
                 console.error('Failed to fetch cities:', err);
